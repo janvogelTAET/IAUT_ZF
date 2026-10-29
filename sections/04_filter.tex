@@ -1,0 +1,183 @@
+% !TEX root = ../main.tex
+% ---------------------------------------------------------------------
+%  B4 -- Signale, Sensoren, digitale Filter (Skript Kap. 3/4/6, Anh. A;
+%        AS 2/3/5; Skript Digitale Regelung Kap. 2/3)
+% ---------------------------------------------------------------------
+\vlsec{cB4}{B4}{Signale, Sensoren, digitale Filter}
+\label{sec:filter}
+
+\subsection{Sensorwert umrechnen}
+\label{rez:skalierung}
+\begin{rezept}[Rohwert \ra Spannung \ra physikalische Grösse]
+\T{1. Klemme:} $U=\dfrac{\text{INT}}{32767}\cdot10\,\text{V}$
+\quad(EL3004: 0\,V $\leftrightarrow$ 0, 10\,V $\leftrightarrow$ 32767).\\
+\T{2. Sensor linear} durch zwei Punkte $(U_1,p_1)$, $(U_2,p_2)$:
+\[ p = p_1 + (U-U_1)\,\frac{p_2-p_1}{U_2-U_1} \]
+\T{3. Ausgabe} zurück: $\text{INT}=\text{REAL\_TO\_INT}(U/10\cdot32767)$.
+\end{rezept}
+\begin{bsp}[MEP HS24: Drucksensor 1\,V $=$ 2\,bar, 10\,V $=$ 10\,bar]
+Steigung $\frac{10-2}{10-1}=\frac{8}{9}$\,bar/V \ra
+$p=2+(U-1)\cdot\frac{8}{9}$. Kontrolle: $U=5.5$\,V \ra $p=6$\,bar.
+\begin{lstlisting}
+FUNCTION F_SensorUmwandlung : REAL     // Rückgabe in bar
+VAR_INPUT iRoh : INT; END_VAR
+VAR       rU   : REAL; END_VAR
+rU := INT_TO_REAL(iRoh) * 10.0 / 32767.0;      // V
+F_SensorUmwandlung := 2.0 + (rU - 1.0) * 8.0 / 9.0;
+\end{lstlisting}
+Rückgabetyp \R{REAL} (Druck ist keine ganze Zahl). FUNCTION reicht,
+weil kein Gedächtnis nötig ist (\ref{sec:pou}).
+\end{bsp}
+\SW{Ultraschall UB120-12GM} an EL3004, \T{single-ended} $=$ Spannung gegen
+gemeinsame Masse (nicht differentiell). Soll die Anzeige im Ruhezustand
+0\,V zeigen, obwohl der Sensor ohne Objekt Maximalspannung liefert:
+$U_{\text{out}}=10-U$.
+
+\subsection{Testsignale (AS 3)}
+\label{sec:signale}
+Zeit im Aufrufer hochzählen: \R{t := t + T;} ($T$ $=$ Zykluszeit in s).
+\begin{lstlisting}
+y := A * SIN(w * t) + yOff;               // Sinus
+IF SIN(w * t) > 0.0 THEN y := yMax;       // Rechteck aus Sinus
+ELSE y := yMin; END_IF
+\end{lstlisting}
+\begin{formel}[PWM als Funktionsblock (Zähler)]
+Periode $T_0=\frac{2\pi}{\omega}$ muss ein \emph{ganzes} Vielfaches der
+Zykluszeit sein: $N_2=T_0/T$ Zyklen pro Periode, $N_1=\text{Duty}\cdot N_2$
+Zyklen \T{ein}. Zähler $<N_1$ \ra $y_{\max}$, sonst $y_{\min}$; bei $N_2$
+auf 0. Auflösung $=N_2$ Stufen (z.\,B.\ $T=10$\,ms, $T_0=100$\,ms \ra nur
+10 Duty-Werte, $f_0=10$\,Hz).
+\end{formel}
+\SW{TwinCAT Scope} misst Variablen \emph{direkt in der SPS} (YT-Chart,
+Trace), kein physischer Messpunkt nötig. Projekt: \emph{TwinCAT
+Measurement} \ra Scope YT \ra Target Browser \ra Record.
+
+\subsection{Gleitender Mittelwert und Forgetting Factor}
+\label{sec:mittelwert}
+\begin{formel}[Mittelwert: nicht-rekursiv \ra rekursiv (exakt)]
+\[M(k)=\frac1N\sum_{j=k-N}^{k}y(j)
+\;\Rightarrow\; M(k)=M(k-1)+\frac1N\big(y(k)-y(k-N-1)\big)\]
+Keine Näherung, nur weniger Rechnung (1 Add.\ + 1 Sub.\ statt $N$).
+Ringpuffer bleibt nötig, weil $y(k-N-1)$ gebraucht wird.
+\end{formel}
+\begin{lstlisting}
+FOR i := 0 TO 98 DO                    // Puffer nach links schieben
+  arBuf[i] := arBuf[i + 1];
+END_FOR
+arBuf[99] := rNeu;                     // neuester Wert hinten
+rSum := 0.0;
+FOR i := 0 TO 99 DO rSum := rSum + arBuf[i]; END_FOR
+rMittel := rSum / 100.0;
+\end{lstlisting}
+\begin{formel}[Forgetting Factor $\lambda<1$, $N\to\infty$]
+Gewichteter Mittelwert, Nenner $1+\lambda+\lambda^2+\dots=\frac{1}{1-\lambda}$:
+\[M(k)=(1-\lambda)\sum_{i\ge0}\lambda^i y(k-i)
+=\lambda\,M(k-1)+(1-\lambda)\,y(k)\]
+(Aufgabe schreibt $y(k-1)$: nur um einen Schritt verschobener Index.)
+Kein Puffer, ein FB mit Gedächtnis \R{meanValue}. $\lambda\to1$: stärker
+geglättet, träger; Faustregel $\approx\frac{1}{1-\lambda}$ Werte
+($\lambda=0.95$ \ra 20).
+\end{formel}
+\begin{lstlisting}
+meanValue := lambda * meanValue + (1.0 - lambda) * inputValue;
+\end{lstlisting}
+
+\subsection{Diskretisierung: von $G(s)$ zur Differenzengleichung}
+\label{rez:diskret}
+\begin{ztab}{@{}lll@{}}
+Methode & Ersetzung & Eigenschaft \\ \midrule
+Euler vorwärts & $s\approx\frac{z-1}{T}$ & einfach, kann instabil werden \\
+\T{Euler rückwärts} & $s\approx\frac{1-z^{-1}}{T}$ & stabil bleibt stabil \\
+Tustin / Trapez & $s\approx\frac2T\frac{1-z^{-1}}{1+z^{-1}}$ & am genausten \\
+\end{ztab}
+\begin{rezept}[Diskretisieren in 5 Schritten]
+\begin{enumerate}
+\item $s=\frac{1-z^{-1}}{T}$ in $G(s)$ einsetzen.
+\item Doppelbruch auflösen: Zähler \emph{und} Nenner mit $T$ bzw.\ $T^2$
+  multiplizieren.
+\item Nenner nach Potenzen $z^0,z^{-1},z^{-2}$ ordnen.
+\item Durch den $z^0$-Koeffizienten teilen \ra Nenner beginnt mit 1.
+\item $z^{-i}\cdot Y\to y(k-i)$ (Verschiebungssatz), nach $y(k)$ auflösen.
+\end{enumerate}
+\T{Kontrolle:} DC-Verstärkung $H(z{=}1)=\frac{\sum b}{1+\sum a}$ muss gleich
+$G(0)$ sein. Rekursiv (IIR) $=$ alte $y$ auf der rechten Seite;
+nicht-rekursiv (FIR) $=$ nur $u$.
+\end{rezept}
+
+\begin{bsp}[Integrator, PT1, PT2 (Euler rückwärts)]
+\T{Integrator} $\frac1s$: $y(k)=y(k-1)+T\,u(k)$ (vorwärts: $T\,u(k-1)$).\\[2pt]
+\T{PT1} $\frac{1}{1+\tau s}$ \ra $\dfrac{T}{T+\tau-\tau z^{-1}}$:
+\[y(k)=\frac{\tau}{\tau+T}\,y(k-1)+\frac{T}{\tau+T}\,u(k)\]
+\T{PT2} $\frac{\omega_0^2}{s^2+2d\omega_0s+\omega_0^2}$, mit
+$a_0=1+2d\omega_0T+\omega_0^2T^2$:
+\[y(k)=\frac{(2+2d\omega_0T)\,y(k-1)-y(k-2)+\omega_0^2T^2\,u(k)}{a_0}\]
+Eckfrequenz PT1 $\omega_e=1/\tau$; Resonanz PT2
+$\omega_r=\omega_0\sqrt{1-2d^2}$.
+\end{bsp}
+
+\begin{bsp}[MEP HS24: Butterworth 2.\ Ordnung]
+\label{bsp:fbfilter}
+$G(s)=\dfrac{\omega_c^2}{s^2+\sqrt2\,\omega_cs+\omega_c^2}$,
+$s^2=\frac{(1-z^{-1})^2}{T^2}=\frac{1-2z^{-1}+z^{-2}}{T^2}$.
+Mal $T^2$:
+\[H(z)=\frac{\omega_c^2T^2}{(1+\sqrt2\omega_cT+\omega_c^2T^2)
+-(2+\sqrt2\omega_cT)z^{-1}+z^{-2}}\]
+Mit $c=1+\sqrt2\,\omega_cT+\omega_c^2T^2$:
+\[a_1=-\frac{2+\sqrt2\,\omega_cT}{c},\;
+a_2=\frac1c,\;b_0=\frac{\omega_c^2T^2}{c},\;b_1=b_2=0\]
+\[y(k)=-a_1y(k-1)-a_2y(k-2)+b_0u(k)\]
+Kontrolle: $\frac{b_0}{1+a_1+a_2}=\frac{\omega_c^2T^2}{c-2-\sqrt2\omega_cT+1}=1$ \checkmark
+\begin{lstlisting}
+FUNCTION_BLOCK FB_Filter
+VAR_INPUT  u, T, wc : REAL; END_VAR
+VAR_OUTPUT y : REAL; END_VAR
+VAR        y1, y2, c, a1, a2, b0 : REAL; END_VAR
+
+c  := 1.0 + SQRT(2.0)*wc*T + wc*wc*T*T;
+a1 := -(2.0 + SQRT(2.0)*wc*T) / c;
+a2 := 1.0 / c;
+b0 := wc*wc*T*T / c;
+y  := -a1*y1 - a2*y2 + b0*u;     // Differenzengleichung
+y2 := y1;                        // Vergangenheit nachschieben
+y1 := y;                         // (Reihenfolge!)
+\end{lstlisting}
+\begin{lstlisting}
+PROGRAM MAIN
+VAR
+  fbFilter : FB_Filter;          // Instanz = Gedächtnis
+  rDruck, rDruckGef : REAL;
+END_VAR
+rDruck := F_SensorUmwandlung(GVL_IO.iDruckRoh);
+fbFilter(u := rDruck, T := 0.01, wc := 10.0);
+rDruckGef := fbFilter.y;
+\end{lstlisting}
+\end{bsp}
+\begin{falle}[Speicher nachschieben]
+Erst $y_2:=y_1$, \emph{dann} $y_1:=y$ -- umgekehrt sind beide gleich.
+Bei Eingängen genauso ($u_2:=u_1$; $u_1:=u$). Die Koeffizienten
+\emph{können} im Init-Zustand einmal berechnet werden (\ref{sec:initrun}).
+\end{falle}
+
+\subsection{z-Transformation und Abtastung (Kurzform)}
+\begin{ztab}{@{}lX@{}}
+Definition & $X(z)=\sum_{k\ge0}x(k)z^{-k}$ \\
+Verschiebung & $y(k-i)\;\circ\!\!-\!\!\bullet\;z^{-i}Y(z)$ \\
+Sprung & $\frac{1}{1-z^{-1}}=\frac{z}{z-1}$ \\
+Endwert & $f(\infty)=\lim_{z\to1}(z-1)F(z)$ \\
+Stabilität & alle Pole $|p_i|<1$ (im Einheitskreis) \\
+Frequenzgang & $z=e^{j\omega T}$, $A=|H|$, $\varphi=\arg H$ \\
+Strecke exakt (ZOH) & $H(z)=\frac{z-1}{z}\,\mathcal Z\{\mathcal L^{-1}\{\frac{G(s)}{s}\}\}$ \\
+\end{ztab}
+\SW{Abtasttheorem} $\omega_s>2\,\omega_{\max}$, sonst \T{Aliasing}
+\ra analoges Anti-Aliasing-Tiefpass (z.\,B.\ Butterworth) vor dem ADC.
+\SW{Faustregel Abtastzeit} PT1: $T\le0.1\,T_1$; PT2 schwingend:
+$T\le0.1\,T_e$; PT2 aperiodisch: $T\le0.1\,T_u$.
+
+\subsection{Wiederverwendung: PLCopenXML und Bibliotheken}
+\label{sec:biblio}
+\T{PLCopenXML}: einzelne POUs exportieren/importieren, herstellerneutral
+(PLCopen, IEC 61131). \T{Bibliothek}: ganzes Projekt versioniert, \emph{Als
+Bibliothek speichern} (Firma, Titel, Version Pflicht), über References
+\ra Bibliothek hinzufügen \ra Repository installieren.
+\T{Compiled Library}: Quellcode nicht sichtbar (Know-how-Schutz). \R{MAIN}
+wird beim Export ignoriert.

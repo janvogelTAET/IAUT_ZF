@@ -1,0 +1,50 @@
+% !TEX root = ../main.tex
+% ---------------------------------------------------------------------
+%  Navigation: Farblegende + "Wenn die Aufgabe lautet ..."
+%  Steht auf der Titelseite, vor dem Inhaltsverzeichnis.
+% ---------------------------------------------------------------------
+
+\begin{tcolorbox}[zfbox, colback=black!2, colframe=black!45,
+  coltitle=white, colbacktitle=black!45, title={Farbcode der Blöcke}]
+\textcolor{cB1}{\rule{7pt}{7pt}}~\T{B1} Grundlagen \quad
+\textcolor{cB2}{\rule{7pt}{7pt}}~\T{B2} TwinCAT/SPS \quad
+\textcolor{cB3}{\rule{7pt}{7pt}}~\T{B3} ST \quad
+\textcolor{cB4}{\rule{7pt}{7pt}}~\T{B4} Filter \\
+\textcolor{cB5}{\rule{7pt}{7pt}}~\T{B5} Automaten \quad
+\textcolor{cB6}{\rule{7pt}{7pt}}~\T{B6} Tasks/EtherCAT \quad
+\textcolor{cB7}{\rule{7pt}{7pt}}~\T{B7} PID \quad
+\textcolor{cB8}{\rule{7pt}{7pt}}~\T{B8} Safety \\[3pt]
+\textcolor{cREF}{\rule{7pt}{7pt}}\,Formel \;
+\textcolor{red!65}{\rule{7pt}{7pt}}\,Falle \;
+\textcolor{green!40!black}{\rule{7pt}{7pt}}\,Rezept \;
+\textcolor{black!55}{\rule{7pt}{7pt}}\,Beispiel \\[3pt]
+\T{MEP:} 120\,min, 120\,Punkte (1\,Punkt $\approx$ 1\,Minute), alle
+Papierunterlagen erlaubt, Code \emph{auf Papier}. Ja/Nein-Fragen:
+falsch $=-1$ \ra bei Unsicherheit leer lassen.
+Abschnitt~11 ist ein Stichwortregister.
+\end{tcolorbox}
+
+\begin{tcolorbox}[zfbox, colback=black!2, colframe=black!45,
+  coltitle=white, colbacktitle=black!45, title={Wenn die Aufgabe lautet \dots}]
+\begin{tabularx}{\linewidth}{@{}Xr@{}}
+Ja/Nein-Fragebogen (HS24, mit Begründung) & \ref{sec:quiz} \\
+Variable in GVL mit Klemme verknüpfen & \ref{rez:gvlio} \\
+Sensorspannung \ra physikalische Grösse & \ref{rez:skalierung} \\
+Warum reicht eine \R{FUNCTION}? & \ref{sec:pou} \\
+$G(s)$ mit $s=\frac{1-z^{-1}}{T}$ diskretisieren & \ref{rez:diskret} \\
+Differenzengleichung als FB programmieren & \ref{bsp:fbfilter} \\
+Zustandsdiagramm skizzieren, ENUM + CASE & \ref{rez:automat} \\
+Förderband-Automat komplett (MEP HS24) & \ref{bsp:foerderband} \\
+Ampel mit Timern, Hand/Automatik & \ref{bsp:ampel} \\
+Zweite Anlage mit gleicher Logik & \ref{falle:instanz} \\
+Timer (\R{TON}/\R{TOF}/\R{TP}) richtig einsetzen & \ref{sec:timer} \\
+Flanke / Doppelklick erkennen & \ref{bsp:edge} \\
+Statuswort zerlegen, \R{SHR}/\R{SHL}, Hex & \ref{rez:statuswort} \\
+Gleitender Mittelwert / Forgetting Factor & \ref{sec:mittelwert} \\
+PID diskretisieren (P, I-Trapez, D gefiltert) & \ref{rez:pid} \\
+Anti-Reset-Windup (Back-Calculation) & \ref{sec:arw} \\
+Tasks: Basiszeit, Priorität, Zeitverlauf & \ref{bsp:tasks} \\
+EtherCAT: on-the-fly, in-place, WC & \ref{sec:ethercat} \\
+RETAIN vs.\ PERSISTENT & \ref{sec:remanenz} \\
+\end{tabularx}
+\end{tcolorbox}

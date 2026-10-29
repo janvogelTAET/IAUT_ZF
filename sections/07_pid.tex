@@ -1,0 +1,149 @@
+% !TEX root = ../main.tex
+% ---------------------------------------------------------------------
+%  B7 -- PID-Regler und Anti-Reset-Windup (Skript Kap. 8/9; AS 7/8;
+%        Folien Reglerdiskretisierung; Skript Digitale Regelung Kap. 4)
+% ---------------------------------------------------------------------
+\vlsec{cB7}{B7}{PID-Regler und Anti-Reset-Windup}
+\label{sec:pid}
+
+\SW{Regelkreis} Sollwert $r$, Regelgrösse $y$, Regeldifferenz
+$e=r-y$, Steuergrösse $u$, Störgrösse; Regler $C(s)$, Strecke $G(s)$.
+Digital: AD-Wandlung \ra $e(k)$ \ra Regelalgorithmus \ra DA-Wandlung, alle
+$T$ einmal.
+\begin{ztab}{@{}lX@{}}
+Anteil & Wirkung \\ \midrule
+P ($K_p$) & sofort proportional; bleibender Fehler (ausser integrierende
+  Strecke); zu gross \ra instabil \\
+I ($T_i$) & summiert $e$ \ra kein bleibender Fehler; träge,
+  Überschwingen, Windup \\
+D ($T_d$) & reagiert auf Änderungsrate, dämpft; verstärkt Rauschen \ra
+  immer mit Tiefpass ($N$) \\
+\end{ztab}
+\begin{formel}[Realer PID (Labor-Form)]
+\[C(s)=\frac{U(s)}{E(s)}=K_p\Big(1+\frac{1}{T_is}+\frac{T_ds}{\frac{T_d}{N}s+1}\Big)\]
+$T_i$ Nachstellzeit, $T_d$ Vorhaltzeit, $T_d/N$ Filterzeitkonstante
+($N\approx1..100$, Labor 20). Umrechnung: $K_i=K_p/T_i$, $K_d=K_pT_d$.\\
+\T{D auf $y$ statt $e$}: Sollwertsprünge würden einen Stoss erzeugen
+\ra $u_d$ aus $-y$ berechnen (Minuszeichen!).
+\end{formel}
+\SW{Indirekter Entwurf} (Labor): analog entwerfen, dann diskretisieren
+\ra keine neuen Methoden, intuitiv; aber nur PID und Abtastung nicht
+explizit berücksichtigt. \T{Direkt}: Strecke $H(z)$, digital entwerfen.
+
+\subsection{Diskretisierung der drei Anteile}
+\label{rez:pid}
+\begin{ztab}{@{}lX@{}}
+P & $u_p(k)=K_p\,e(k)$ \\
+I Rechteck rückw. & $u_i(k)=u_i(k-1)+\frac{K_pT}{T_i}\,e(k)$ \\
+I Rechteck vorw. & $u_i(k)=u_i(k-1)+\frac{K_pT}{T_i}\,e(k-1)$ \\
+\T{I Trapez} & $u_i(k)=u_i(k-1)+\frac{K_pT}{2T_i}\big(e(k)+e(k-1)\big)$ \\
+D ungefiltert & $u_d(k)=\frac{K_pT_d}{T}\big(e(k)-e(k-1)\big)$ \\
+\T{D gefiltert} & $u_d(k)=\frac{T_d}{T_d+NT}\,u_d(k-1)+\frac{K_pT_dN}{T_d+NT}\big(e(k)-e(k-1)\big)$ \\
+D auf $y$ & wie oben mit $-\big(y(k)-y(k-1)\big)$ statt $\Delta e$ \\
+Summe & $u(k)=u_p(k)+u_i(k)+u_d(k)$ \\
+\end{ztab}
+\begin{formel}[Herleitung D gefiltert (Rückwärts-Rechteck)]
+$\big(\tfrac{T_d}{N}s+1\big)U_d=K_pT_d\,s\,E$, mit $s\to\frac{1-z^{-1}}{T}$:
+\[\frac{T_d}{NT}\big(u_d(k)-u_d(k-1)\big)+u_d(k)=\frac{K_pT_d}{T}\big(e(k)-e(k-1)\big)\]
+Mal $NT$: $(T_d+NT)\,u_d(k)=T_d\,u_d(k-1)+K_pT_dN\,\Delta e$
+\ra nach $u_d(k)$ auflösen \ra Tabelle.\\
+Summe \ra Rekursion: $\sum_{i=0}^{k}=\sum_{i=0}^{k-1}+$ neuer Summand
+\ra konstante Rechenzeit und Speicher.
+\end{formel}
+
+\subsection{Virtuelle Strecke PT1T2 (AS 7)}
+$G(s)=\frac{K}{(1+T_1s)(1+T_2s)}$, $a_1=e^{-T/T_1}$, $a_2=e^{-T/T_2}$:
+\[H(z)=\frac{b_0z+b_1}{z^2+c_1z+c_2},\quad c_1=-(a_1+a_2),\; c_2=a_1a_2\]
+\[b_0=\tfrac{K}{T_1-T_2}\big[T_1(1-a_1)-T_2(1-a_2)\big]\]
+\[b_1=\tfrac{K}{T_1-T_2}\big[T_2a_1(1-a_2)-T_1a_2(1-a_1)\big]\]
+\[y(k)=-c_1y(k-1)-c_2y(k-2)+b_0u(k-1)+b_1u(k-2)\]
+\SW{Test} $K=10$, $T_1=0.1$, $T_2=0.01$; Regler $K_p=1/K$, $T_i=T_1$,
+$T_d=T_2$ (kürzt die Strecken-Pole).
+
+\subsection{Init/Run-Muster}
+\label{sec:initrun}
+Konstante Koeffizienten nur \emph{einmal} im Init rechnen, im Run nur die
+Differenzengleichung \ra minimale CPU-Last pro Zyklus.
+\begin{lstlisting}
+TYPE System_Modus_Enum : (System_Init, System_Run); END_TYPE
+TYPE PID_Parameter_Strukt :
+STRUCT
+  Kp, Ti, Td : REAL;  N : UINT;   ARW : BOOL;
+  umin, umax, Tr : REAL;
+END_STRUCT
+END_TYPE
+
+FUNCTION_BLOCK PID_Regler
+VAR_INPUT
+  r, y : REAL;  Modus : System_Modus_Enum;
+  Param : PID_Parameter_Strukt;  T : REAL;
+END_VAR
+VAR_OUTPUT u, usat : REAL; END_VAR
+VAR
+  e, e1, y1, up, ui, ud : REAL;
+  ci, cd1, cd2 : REAL;               // vorberechnete Koeffizienten
+END_VAR
+
+CASE Modus OF
+System_Init:
+  ci  := Param.Kp * T / (2.0 * Param.Ti);
+  cd1 := Param.Td / (Param.Td + UINT_TO_REAL(Param.N) * T);
+  cd2 := Param.Kp * Param.Td * UINT_TO_REAL(Param.N)
+         / (Param.Td + UINT_TO_REAL(Param.N) * T);
+  ui := 0.0; ud := 0.0; e1 := 0.0; y1 := y;
+System_Run:
+  e  := r - y;
+  up := Param.Kp * e;
+  ud := cd1 * ud - cd2 * (y - y1);         // D auf y
+  u  := up + ui + ud;                      // ui(k-1)!
+  IF u > Param.umax THEN usat := Param.umax;    // Sättigung
+  ELSIF u < Param.umin THEN usat := Param.umin;
+  ELSE usat := u; END_IF
+  ui := ui + ci * (e + e1);                // Trapez
+  IF Param.ARW THEN                        // Back-Calculation
+    ui := ui + T / Param.Tr * (usat - u);
+  END_IF
+  e1 := e;  y1 := y;
+END_CASE
+\end{lstlisting}
+
+\subsection{Stellgrössenbegrenzung und Anti-Reset-Windup}
+\label{sec:arw}
+\SW{Sättigung} Jeder Aktor ist begrenzt (Ventil offen, Spannung):
+$u_{\text{sat}}=u_{\max}$ wenn $u\ge u_{\max}$, $u_{\min}$ wenn
+$u\le u_{\min}$, sonst $u$. Die Begrenzung gehört physikalisch zur
+Strecke, der Regler muss $u_{\text{sat}}$ aber kennen.
+\begin{formel}[Windup]
+Ist $u$ lange am Anschlag, integriert der I-Anteil die Regeldifferenz
+ungebremst weiter, obwohl mehr Stellgrösse nicht wirkt. Nach dem
+Vorzeichenwechsel von $e$ muss er erst wieder abgebaut werden \ra starkes,
+langes \T{Überschwingen}, träge Reaktion auf neuen Sollwert, eventuell
+Zahlenüberlauf.
+\end{formel}
+\begin{ztab}{@{}lX@{}}
+Massnahme & Prinzip \\ \midrule
+Conditional Integration & I-Anteil anhalten, solange gesättigt (und $e$
+  weiter in dieselbe Richtung zeigt). Einfach, dynamisch nicht optimal. \\
+\T{Back-Calculation} & Differenz $u_{\text{sat}}-u$ mit $\frac{1}{T_r}$
+  gewichtet vor den Integrator zurückführen. Ohne Sättigung ist die
+  Differenz 0 \ra kein Einfluss. \\
+\end{ztab}
+\begin{formel}[ARW diskret (Folien)]
+$u_{\text{nosat}}(k)=u_p(k)+u_i(k-1)+u_d(k)$ \ra begrenzen \ra
+\[u_i(k)=u_i(k-1)+\frac{K_pT}{T_i}\,\frac{e(k)+e(k-1)}{2}
++\frac{T}{T_r}\big(u_{\text{sat}}(k)-u_{\text{nosat}}(k)\big)\]
+Startwert $T_r=\sqrt{T_iT_d}$ oder $\frac{T_i+T_d}{2}$ (Labor
+Motor: $T_r=\sqrt{T_iT_d}$, $N=20$).
+\end{formel}
+\SW{Test AS 8} $u_{\min}=0$, $u_{\max}=10$; Sollwert als PWM 25 \ra 75;
+$K_p\in\{\frac1K,\frac{10}{K},\frac{100}{K}\}$ -- hohe Verstärkung zeigt
+den Windup am deutlichsten; wird es instabil, $T$ verkleinern.
+
+\subsection{Laborversuch (Semesterleistung)}
+SPS: Messsignale im Scope, Aktoren im Config-Modus, Zustandsmaschine
+Hand/Auto bzw.\ Open-/Closed-Loop in \R{MAIN}, PID-FB, Prozess-FB.
+Identifikation per \T{Sprungantwort} ($K,\tau_1,\tau_2$), Entwurf
+(Ziegler-Nichols, SISO-Tool), Reserven: Phase $\ge50^\circ$,
+Amplitude $\ge8$\,dB. Encoder EL5101 zählt alle Flanken von A und B
+\ra $4\times$ Auflösung (512 \ra 2048/Umdrehung); Zählerüberlauf abfangen.
+Motor EL7342: $\pm32767\leftrightarrow\pm24$\,V.

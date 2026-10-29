@@ -1,0 +1,75 @@
+% !TEX root = ../main.tex
+% ---------------------------------------------------------------------
+%  B6 -- Tasks, Echtzeit, EtherCAT (Skript Kap. 7; AS 6)
+% ---------------------------------------------------------------------
+\vlsec{cB6}{B6}{Tasks, Echtzeit, EtherCAT}
+\label{sec:tasks}
+
+\SW{Task} Ausführungseinheit: ruft die zugeordneten Programme mit fester
+\T{Zykluszeit} und \T{Priorität} auf. Mehrere Tasks \ra verschiedene
+Programme mit verschiedenen Zykluszeiten im selben Projekt.
+\SW{Determinismus} Programm läuft exakt alle $T$. Schwankung $=$
+\T{Jitter} \ra Regler stimmt nicht mehr (Entwurf setzt konstantes $T$
+voraus), Roboter positioniert falsch, Druck an falscher Stelle.
+
+\begin{formel}[Prioritäten in TwinCAT]
+\T{Präemptiv}: Wird ein höher priorer Task fällig, wird der laufende
+niedriger priore unterbrochen und später fortgesetzt.\\
+\T{1 $=$ höchste} Priorität. \T{Jede Prioritätsstufe nur für genau einen
+Task} -- zwei Tasks mit gleicher Priorität geht nicht.\\
+Zykluszeit $=$ ganzzahliges Vielfaches der \T{Basiszeit} (SYSTEM \ra
+Echtzeit), eingestellt in Zyklusticks.
+\end{formel}
+\begin{falle}[Zykluszeit und CPU-Last]
+Kürzere Zykluszeit \ra Programm läuft öfter \ra \emph{höhere}
+CPU-Auslastung. Last je Task $=\frac{\text{Laufzeit}}{\text{Zykluszeit}}$.
+Summe $>100\,\%$ \ra Überlast, niedrig priore Tasks verpassen ihren Zyklus.
+\end{falle}
+
+\begin{bsp}[AS 6: drei Tasks, je 30\,$\mu$s Rechenzeit]
+\label{bsp:tasks}
+FastTask 300\,$\mu$s Prio 2, Standard 1\,ms Prio 1, SlowTask 10\,ms Prio 3.\\
+\T{Basiszeit}: muss 300\,$\mu$s und 1\,ms teilen \ra $\text{ggT}=100\,\mu$s.\\
+\T{Last}: $\frac{30}{300}+\frac{30}{1000}+\frac{30}{10000}=10+3+0.3=13.3\,\%$.\\
+\T{$t=0$} (alle fällig): Standard 0--30, Fast 30--60, Slow 60--90\,$\mu$s.\\
+\T{$t=3$\,ms} (Fast + Standard): Standard zuerst, Fast 30\,$\mu$s zu spät
+\ra Jitter für Fast. Sonst laufen die Tasks allein.\\
+\T{Lehre:} Der schnellste Task sollte die höchste Priorität haben, sonst
+wird gerade er verzögert.
+\end{bsp}
+
+\subsection{EtherCAT}
+\label{sec:ethercat}
+\begin{formel}[Funktionsprinzip]
+Normales Ethernet-Frame, \T{Ethertype \R{0x88A4}}. Der Master (SPS)
+sendet ein Frame mit allen Ausgangsdaten; es läuft \emph{seriell} durch alle
+Klemmen, die letzte schickt es zurück (Ring). Jede Klemme entnimmt ihre
+Ausgänge und setzt ihre Eingänge ein.\\
+\T{On-the-fly}: Verarbeitung \emph{während} das Frame durchläuft
+(ns Verzögerung) statt empfangen-verarbeiten-senden.\\
+\T{In-place}: Eingangsdaten überschreiben bereits gelesene Ausgangsdaten
+\ra Frame bleibt kurz.\\
+Master-Netzwerkkarte schreibt per \T{DMA} direkt ins RAM \ra
+Protokollbearbeitung in Hardware, unabhängig von CPU-Last.
+\end{formel}
+\SW{Zahlen} Zyklen $\le100\,\mu$s; 256 verteilte DIO in 10\,$\mu$s,
+1000 DIO in 30\,$\mu$s; Synchronisation (Distributed Clocks) Jitter
+$\le1\,\mu$s; offener Standard (ETG), günstige Standard-Hardware.
+\SW{Frames} Pro Task mit E/A ein eigenes Frame/Zyklus (Reiter EtherCAT
+am Gerät, Spalte Cycle).
+\SW{EL6601} Standard-Ethernet in den Lücken zwischen EtherCAT-Frames.
+\SW{XFC / Oversampling} z.\,B.\ EL1262: $n$ Abtastungen pro Buszyklus
+($1\,\text{ms}/n=10$ \ra 100\,$\mu$s), gesammelt übertragen.
+
+\begin{ztab}{@{}lX@{}}
+Begriff & Bedeutung \\ \midrule
+Working Counter (WC) & Jede Klemme, die ihr Datagramm bearbeitet,
+  erhöht den WC. Master vergleicht mit Sollwert: Abweichung \ra Daten
+  dieser Gruppe ungültig, Diagnose. \\
+Sync Unit & Gruppe von Klemmen mit eigenem WC. Fällt eine Gruppe aus,
+  bleiben die Daten der anderen gültig. Konfiguration am EtherCAT-Gerät
+  (Sync-Unit-Zuordnung). \\
+Hot Connect & Gerätegruppen, die im Betrieb an- und abgesteckt werden
+  dürfen (Werkzeugwechsler, modulare Maschinenteile) -- typischer Fall,
+  wo Sync Units unabdingbar sind. \\
+\end{ztab}

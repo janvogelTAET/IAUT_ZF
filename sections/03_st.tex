@@ -1,0 +1,192 @@
+% !TEX root = ../main.tex
+% ---------------------------------------------------------------------
+%  B3 -- Strukturierter Text (Skript Kap. 3, Anhang C, E; AS 2)
+% ---------------------------------------------------------------------
+\vlsec{cB3}{B3}{Strukturierter Text (ST)}
+\label{sec:st}
+
+\subsection{POU-Typen: Funktion, Funktionsblock, Programm}
+\label{sec:pou}
+\begin{ztab}{@{}lXXX@{}}
+ & \R{FUNCTION} & \R{FUNCTION\_BLOCK} & \R{PROGRAM} \\ \midrule
+Gedächtnis & \T{nein} & ja (pro Instanz) & ja \\
+Instanz & keine & \T{muss} instanziiert werden & genau eine, global \\
+Rückgabe & 1 Wert über Namen (+ \R{VAR\_OUTPUT}) & beliebig viele \R{VAR\_OUTPUT} & Variablen \\
+Aufruf & \R{x := F(a,b);} & \R{fb(in:=a); y:=fb.out;} & \R{P(); P.var} \\
+Typisch & Umrechnung, Formel & Zähler, Filter, Flanke, Regler, Automat & \R{MAIN}, an Task \\
+\end{ztab}
+\begin{formel}[Wann reicht eine FUNCTION? (MEP-Frage)]
+Wenn das Ergebnis \emph{nur vom aktuellen Eingang} abhängt -- z.\,B.\
+Sensor-Rohwert \ra bar. Keine Werte aus früheren Zyklen nötig \ra kein
+Gedächtnis \ra Funktion genügt. Sobald $y(k-1)$, $u(k-1)$, ein Timer oder
+ein Zustand gebraucht wird \ra \R{FUNCTION\_BLOCK}.
+\end{formel}
+\SW{Programm-Variablen} von aussen lesbar mit \R{DoSomeMath.rSumme}.
+Debugger: Breakpoint F9, Schritt F10/F8. Eine Funktion zeigt bei jedem
+Aufruf frisch initialisierte lokale Variablen.
+
+\subsection{Deklaration}
+\begin{lstlisting}
+FUNCTION F_Name : REAL        // Name : Rückgabetyp
+VAR_INPUT  a, b : REAL;   END_VAR   // Kopie hinein
+VAR_OUTPUT err  : BOOL;   END_VAR   // zusätzliche Ausgänge
+VAR_IN_OUT arr  : ARRAY[*] OF INT; END_VAR // Referenz
+VAR        tmp  : REAL := 0.0; END_VAR   // lokal
+F_Name := a + b;              // Rückgabe = Funktionsname
+\end{lstlisting}
+Form immer \R{Name : Typ := Startwert;}. Ohne Startwert: 0 / \R{FALSE} /
+0.0. Kommentare \R{(* *)} oder \R{//}. Zuweisung \R{:=}, Vergleich \R{=},
+ungleich \R{<>}.
+
+\subsection{Datentypen und Zahlendarstellung}
+\begin{ztab}{@{}llX@{}}
+Typ & Bit & Bereich / Zweck \\ \midrule
+\R{BOOL} & 1 & TRUE/FALSE \\
+\R{SINT}/\R{USINT} & 8 & $-128..127$ / $0..255$ \\
+\R{INT}/\R{UINT} & 16 & $-32768..32767$ / $0..65535$ \\
+\R{DINT}/\R{UDINT} & 32 & $\pm2.1\cdot10^9$ / $0..4.3\cdot10^9$ \\
+\R{REAL}/\R{LREAL} & 32/64 & IEEE 754, $\approx$7 / 15 Stellen \\
+\R{BYTE}..\R{LWORD} & 8..64 & Bitmuster, nur Bitoperationen \\
+\R{TIME} & 32 & \R{T\#5S}, \R{T\#500MS}, \R{T\#1M30S} \\
+\end{ztab}
+\SW{Literale} \R{181} $=$ \R{2\#1011\_0101} $=$ \R{16\#B5}. Eine
+Hex-Ziffer $=$ 4 Bit.
+\SW{Zweierkomplement} negativ: alle Bits invertieren, $+1$.
+$-5$ als INT $=$ \R{16\#FFFB}; dasselbe Bitmuster als UINT $=65531$.
+Ein negativer Wert mehr als positive (INT bis $-32768$).
+\SW{REAL} $(-1)^S\cdot1.M\cdot2^{E-127}$; $6.5=$ \R{16\#40D00000}.
+0.1 ist nicht exakt darstellbar \ra REAL nie mit \R{=} vergleichen,
+sondern mit Toleranz.
+
+\subsection{Operatoren und Kontrollstrukturen}
+Priorität: Klammern, Funktionsaufruf, \R{NOT}, \R{* / MOD}, \R{+ -},
+Vergleiche, \R{AND}, \R{XOR}, \R{OR}. Im Zweifel klammern.
+\begin{lstlisting}
+IF a THEN ... ELSIF b THEN ... ELSE ... END_IF
+CASE state OF
+  ST_A:        ...;
+  ST_B, ST_C:  ...;       // mehrere Werte
+  1..3:        ...;       // Bereich
+ELSE ...;
+END_CASE
+FOR i := 0 TO 9 BY 1 DO ... END_FOR    // feste Anzahl
+WHILE bed DO ... END_WHILE            // prüft VOR Durchlauf
+REPEAT ... UNTIL bed END_REPEAT       // prüft NACH: min. 1x
+EXIT;     // innerste Schleife verlassen
+RETURN;   // Baustein verlassen
+\end{lstlisting}
+\begin{falle}[WHILE in einer SPS]
+Die ganze Schleife läuft in \emph{einem} Zyklus. Eingänge ändern sich
+währenddessen nie (PAE ist eingefroren) \ra hängt die Abbruchbedingung an
+einem Eingang, entsteht eine Endlosschleife \ra Zykluszeit-Überschreitung,
+Task blockiert. Der SPS-Zyklus \emph{ist} schon die Schleife \ra lieber
+\R{FOR} mit fester Anzahl oder pro Zyklus einen Schritt.
+\end{falle}
+
+\subsection{Arrays, Strukturen, Aufzählungen}
+\begin{lstlisting}
+arBuf : ARRAY[0..99] OF REAL;          // Index ausserhalb = Laufzeitfehler
+arM   : ARRAY[0..3, 0..3] OF INT;      // 2D
+arInit: ARRAY[0..4] OF REAL := [1.0, 2.5, 3.0, 0.5, 4.0];
+
+TYPE ST_Status :                       // unter DUTs anlegen
+STRUCT
+  bTaster : BOOL;
+  rVolt   : REAL;
+END_STRUCT
+END_TYPE
+arHist : ARRAY[0..99] OF ST_Status;    // Array aus Strukturen
+arHist[k].rVolt := 2.5;                // Punktnotation
+
+TYPE E_Monat : (JANUAR := 1, FEBRUAR, MAERZ); END_TYPE
+eM : E_Monat := JANUAR;
+\end{lstlisting}
+\begin{falle}[ENUM beginnt nicht \emph{immer} bei 0]
+Ohne Angabe zählt TwinCAT ab 0 aufwärts -- man darf aber Werte setzen
+(\R{JANUAR := 1}). Ein ENUM ist nur Lesbarkeit, im Maschinencode steht
+eine Zahl.
+\end{falle}
+\SW{Array zurückgeben} Rückgabetyp \R{ARRAY[0..99] OF REAL} geht (feste
+Grösse). Variable Länge nur als \R{VAR\_IN\_OUT arr : ARRAY[*] OF INT;}
+mit \R{LOWER\_BOUND(arr,1)} / \R{UPPER\_BOUND(arr,1)} (liefern DINT).
+
+\subsection{Typkonvertierung}
+Keine impliziten Umwandlungen: immer \R{QUELLE\_TO\_ZIEL(x)}.
+\R{REAL\_TO\_INT} rundet kaufmännisch, \R{TRUNC} schneidet ab,
+\R{INT\_TO\_REAL} verlustfrei, \R{WORD\_TO\_INT}/\R{BOOL\_TO\_INT} für
+Bitmuster.
+\begin{falle}[Ganzzahldivision]
+\R{INT / INT} bleibt INT: \R{7/2 = 3}. Für Skalierungen zuerst
+\R{INT\_TO\_REAL} und mit \R{10.0} statt \R{10} rechnen.
+\end{falle}
+
+\subsection{Bitoperationen und Statuswort}
+\label{rez:statuswort}
+\R{SHR(x,n)} $=$ $x/2^n$ (rechts schieben), \R{SHL(x,n)} $=$ $x\cdot2^n$.
+Einzelbit direkt: \R{w.6}. Setzen mit \R{OR}, löschen mit \R{AND NOT},
+toggeln mit \R{XOR}.
+\begin{rezept}[Bitfeld aus einem WORD extrahieren]
+Maske mit \R{AND} \ra mit \R{SHR} an Stelle 0 schieben \ra konvertieren:
+\R{inLength := WORD\_TO\_INT(SHR(sw AND 16\#FF00, 8));}\\
+Einzelbit: \R{bOverrun := sw.6;} oder
+\R{(SHR(sw,6) AND 16\#0001) = 1}.
+\end{rezept}
+\begin{bsp}[AS 2: Shift und Statuswort]
+\R{myWord := 16\#5D7A} (23930). \R{SHR(myWord,3)} $=$ \R{16\#0BAF} $=$
+2991 (Rest .25 fällt weg).\\
+\R{SHL(WORD\_TO\_DWORD(myWord),3)} $=$ \R{16\#0002EBD0} $=$ 191440. Ohne
+DWORD-Wandlung fallen die oberen Bits raus (\R{16\#EBD0}).\\
+\R{myDWord OR 16\#F0000000} $=$ \R{16\#F002EBD0} (oberste 4 Bit gesetzt).\\[2pt]
+RS232-Statuswort:\\
+{\scriptsize\begin{tabular}{@{}l*{8}{c}@{}}
+Bit & 15..8 & 7 & 6 & 5 & 4 & 3 & 2 & 1/0 \\
+ & InLength & -- & OR & FR & PA & BUF\_F & IA & RR/TA \\
+\end{tabular}}\\[2pt]
+\begin{tabularx}{\linewidth}{@{}lrX@{}}
+\R{16\#1D06} & 29 & IA, RR \\
+\R{16\#534C} & 83 & OR\_ERR, BUF\_F, IA \\
+\R{16\#C705} & 199 & IA, TA \\
+\end{tabularx}
+\end{bsp}
+
+\subsection{Standardbausteine: Timer und Flanken}
+\label{sec:timer}
+\begin{ztab}{@{}lX@{}}
+FB & Verhalten (Eingang \R{IN}, Zeit \R{PT}, Ausgang \R{Q}, \R{ET}) \\ \midrule
+\R{TON} & Einschaltverzögert: \R{Q} wird TRUE, wenn \R{IN} schon \R{PT} lang TRUE ist. \R{IN}=FALSE \ra Reset. \\
+\R{TOF} & Ausschaltverzögert: \R{Q} folgt \R{IN} sofort auf TRUE, bleibt nach Abfall noch \R{PT} TRUE. \\
+\R{TP} & Puls: steigende Flanke \ra \R{Q} genau \R{PT} lang TRUE, nicht retriggerbar. \\
+\R{R\_TRIG}/\R{F\_TRIG} & \R{CLK} \ra \R{Q} einen Zyklus TRUE bei steigender/fallender Flanke. \\
+\R{CTU}/\R{CTD}, \R{RS}/\R{SR} & Zähler, Flipflops (gleiches Muster) \\
+\end{ztab}
+\begin{lstlisting}
+VAR tonBlink : TON; bLampe : BOOL; END_VAR
+// selbstrücksetzender Takt: toggelt alle 167 ms (= 3 Hz)
+tonBlink(IN := bAktiv AND NOT tonBlink.Q, PT := T#167MS);
+IF tonBlink.Q THEN bLampe := NOT bLampe; END_IF
+\end{lstlisting}
+\begin{falle}[Timer-Fallen]
+Den Timer \T{jeden Zyklus} aufrufen (nicht nur im IF) -- sonst läuft
+\R{ET} nicht. Zum Neustarten muss \R{IN} einen Zyklus FALSE sein. Im
+Automaten \R{IN := (state = ST\_X)} schreiben, dann startet er beim
+Zustandseintritt und setzt sich beim Verlassen selbst zurück.
+Blinkfrequenz $f$: halbe Periode $=\frac{1}{2f}$.
+\end{falle}
+
+\begin{bsp}[EdgeDetector mit Doppelklick (AS 2)]
+\label{bsp:edge}
+\begin{lstlisting}
+FUNCTION_BLOCK EdgeDetector
+VAR_INPUT  inputValue : BOOL; tDouble : TIME := T#400MS; END_VAR
+VAR_OUTPUT risingEdge, fallingEdge, doubleClick : BOOL; END_VAR
+VAR        lastValue : BOOL; tpWin : TP; END_VAR
+
+risingEdge  := inputValue AND NOT lastValue;
+fallingEdge := NOT inputValue AND lastValue;
+lastValue   := inputValue;          // Wert für nächsten Zyklus
+doubleClick := risingEdge AND tpWin.Q;  // 2. Flanke im Fenster
+tpWin(IN := risingEdge AND NOT doubleClick, PT := tDouble);
+\end{lstlisting}
+Eine Instanz pro Taster (\R{edgeGelb}, \R{edgeBlau}) -- jede hat ihr
+eigenes \R{lastValue}.
+\end{bsp}

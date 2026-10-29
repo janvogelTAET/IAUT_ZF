@@ -1,0 +1,123 @@
+% !TEX root = ../main.tex
+% ---------------------------------------------------------------------
+%  B2 -- SPS und TwinCAT (Skript Kap. 2, Anhang B, D, F; AS 1)
+% ---------------------------------------------------------------------
+\vlsec{cB2}{B2}{SPS und TwinCAT}
+\label{sec:twincat}
+
+\begin{formel}[Scan-Zyklus einer SPS]
+\T{1.} Alle Eingänge ins \T{Prozessabbild der Eingänge} (PAE) lesen
+\ra \T{2.} Programm auf diesem eingefrorenen Abbild abarbeiten
+\ra \T{3.} \T{Prozessabbild der Ausgänge} (PAA) auf die Klemmen schreiben.
+Wiederholt mit fester Zykluszeit. Eine Eingangsänderung \emph{während}
+des Zyklus wird erst im nächsten Zyklus sichtbar.
+\end{formel}
+
+\SW{TwinCAT} Soft-SPS: Echtzeitkern \emph{unter} Windows. Engineering
+(Visual Studio + TwinCAT XAE) auf dem Entwicklungsrechner (ER), Runtime auf
+dem Zielsystem (Labor: CX5010/CX9020). TwinCAT ist \emph{Software}, kein
+Feldbus -- der Feldbus heisst EtherCAT.
+
+\SW{LEDs} PWR grün $=$ Strom. TC \T{grün} $=$ Run-Modus (Boot-Projekt
+läuft), TC \T{blau} $=$ Config-Modus.
+\SW{Modi} \T{Config} (mit \T{Freerun}: Klemmen ohne Programm testen,
+Reiter \emph{Online}), \T{Run} (Programm läuft).
+
+\subsection{Vom leeren Projekt zum laufenden Programm}
+\begin{rezept}[Ablauf (AS 1)]
+\begin{enumerate}
+\item ER und SPS ins \T{gleiche Subnetz} (statische IP), \R{ping}.
+\item TwinCAT-XAE-Projekt \ra Zielsystem wählen \ra suchen \ra
+  \T{Route zufügen} (siehe ADS unten).
+\item E/A \ra Gerät 1 (EtherCAT) \ra \T{Scan} / \emph{Nach Boxen suchen}.
+\item SPS-Projekt hinzufügen (\R{MAIN} entsteht), Task-Zykluszeit setzen
+  (z.\,B.\ 5 Zyklusticks $=$ 5\,ms).
+\item GVL mit \R{AT \%I*} / \R{AT \%Q*}-Variablen, Code schreiben.
+\item \T{Projektmappe erstellen} (kompilieren).
+\item \emph{Instance} \ra PlcTask Inputs/Outputs \ra \T{Verknüpfung ändern}
+  -- es werden nur typ- und grössengleiche Prozessdaten angeboten.
+\item \T{Konfiguration aktivieren} (Zuordnungen), Run-Modus.
+\item SPS \ra \T{Einloggen} (lädt Programm) \ra \T{Start}.
+\end{enumerate}
+Jede Codeänderung: neu erstellen und neu laden. Online kann man Werte
+\T{schreiben} oder \T{forcieren} (testen ohne Hardware).
+\end{rezept}
+
+\subsection{E/A-Variablen und Verknüpfung}
+\label{rez:gvlio}
+\begin{lstlisting}
+{attribute 'qualified_only'}  // Zugriff nur als GVL_IO.xxx
+VAR_GLOBAL
+  bTasterGelb   AT %I* : BOOL;  // Eingang (EL1004)
+  bLampeRot     AT %Q* : BOOL;  // Ausgang (EL2004)
+  iSensorRoh    AT %I* : INT;   // Analog-Eingang (EL3004)
+  iAnalogOut    AT %Q* : INT;   // Analog-Ausgang (EL4034/EL3034)
+END_VAR
+VAR_GLOBAL CONSTANT
+  rT : REAL := 0.01;            // Abtastzeit (s)
+END_VAR
+\end{lstlisting}
+\begin{formel}[AT-Adressen]
+\R{\%I*} $=$ Eingang, \R{\%Q*} $=$ Ausgang, \R{*} $=$ Adresse vergibt
+TwinCAT. Die Zuordnung zur Klemme passiert im Engineering, nicht im Code
+\ra gleiche Software auf anderer Hardware. Typ muss passen: 16-Bit-Analog
+\ra \R{INT}, Digital \ra \R{BOOL}. Ohne \R{AT} erscheint die Variable
+\emph{nicht} im Prozessabbild.
+\end{formel}
+\begin{falle}[GVL ist nicht nur für Klemmen]
+Globale Variablenlisten enthalten auch Konstanten
+(\R{VAR\_GLOBAL CONSTANT}) und normale globale Daten. Mit
+\R{qualified\_only} muss man \R{GVL\_IO.} immer davor schreiben.
+\end{falle}
+
+\SW{Analoge Klemmen} 0--10\,V $\leftrightarrow$ \R{INT} 0--32767.
+10\,V am Ausgang \ra Wert 32767 ($=2^{15}-1$, grösster INT).
+EL3004: 4 Kanäle, 12 Bit Auflösung, Rohwert ändert sich in 16er-Schritten.
+
+\subsection{Projektstruktur (TwinCAT XAE)}
+\begin{ztab}{@{}lX@{}}
+SYSTEM & Tasks, Echtzeit, Lizenzen, Routen \\
+MOTION & NC-Achsen (nicht im Labor) \\
+SPS & IEC-61131-Projekte \\
+SAFETY & TwinSAFE-Logik (eigene Logic-Klemme) \\
+E/A & EtherCAT-Klemmen, Prozessabbild \\ \midrule
+References & Bibliotheken (\R{Tc2\_Standard}: \R{TON}, \R{R\_TRIG}) \\
+DUTs & eigene Typen: STRUCT, ENUM \\
+GVLs / POUs & globale Variablen / Programmcode \\
+VISUs & Visualisierung (+ VISU\_TASK, eigener langsamer Task) \\
+.tmc & Symbolbeschreibung für ADS-Zugriff von aussen \\
+Instance & mit Hardware verknüpfte Instanz (PlcTask In/Out) \\
+\end{ztab}
+
+\SW{ADS} Beckhoff-Protokoll über TCP/IP für Download, Start/Stopp,
+Online-Monitoring. Ziel $=$ (\T{AMS Net Id}, ADS-Port); AMS Net Id
+z.\,B.\ \R{5.62.71.101.1.1} (oft IP + \R{.1.1}), bleibt bei IP-Wechsel.
+\T{Route} $=$ Vertrauensbeziehung, sonst nimmt die SPS keine ADS-Befehle an.
+Der \T{TwinCAT-Systemdienst} läuft immer (AMS-Router), auch ohne Visual
+Studio.
+
+\SW{CoE} Objektverzeichnis der Klemme (Index:Subindex, z.\,B.\
+\R{0x8000:02}). EL3004 \R{0x80n0}: \R{:02} Presentation (\T{Signed} $=$
+Zweierkomplement $=$ INT, darum direkt \R{INT\_TO\_REAL}), \R{:06}/\R{:15}
+Filter, \R{:07} Grenzwert \ra Statusbit (die Klemme erkennt das
+\emph{selbst}, ohne SPS). CoE-Online wirkt sofort, aber nur bis Neustart;
+dauerhaft \ra \T{CoE-Startup}-Liste.
+
+\subsection{Remanente Variablen}
+\label{sec:remanenz}
+\begin{ztab}{@{}lccc@{}}
+Ereignis & normal & \R{RETAIN} & \R{PERSISTENT} \\ \midrule
+Online Change & bleibt & bleibt & bleibt \\
+Reset warm & weg & bleibt & bleibt \\
+Reset kalt & weg & weg & bleibt \\
+Neuer Download & weg & weg & bleibt \\
+Reset Ursprung & weg & weg & weg \\
+\end{ztab}
+\begin{lstlisting}
+VAR RETAIN     rIntegrator  : REAL; END_VAR
+VAR PERSISTENT diStueckzahl : DINT; END_VAR
+\end{lstlisting}
+\SW{Wann was} Stückzähler über Programm-Update \ra \R{PERSISTENT}.
+I-Anteil eines Reglers über kurzen Neustart \ra \R{RETAIN}.
+\T{USV/UPS}: Akku/Kondensator überbrückt Stromausfall, Zeit zum Sichern.
+\T{NOVRAM}: nichtflüchtiger RAM, jeden Zyklus beschreibbar.

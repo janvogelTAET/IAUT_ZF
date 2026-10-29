@@ -1,0 +1,55 @@
+% !TEX root = ../main.tex
+% ---------------------------------------------------------------------
+%  B8 -- Funktionale Sicherheit, TwinSAFE (Skript Kap. 10; AS 9)
+% ---------------------------------------------------------------------
+\vlsec{cB8}{B8}{Funktionale Sicherheit und TwinSAFE}
+\label{sec:safety}
+
+\SW{Funktionale Sicherheit} Die Steuerung schützt Personen und Umwelt,
+nicht nur den Betrieb. Oft sicherer, kontrolliert zu stoppen als einfach
+die Energie zu kappen \ra Not-Halt, Schutztür, Zweihand in die SPS.
+\begin{ztab}{@{}lX@{}}
+Norm & Einstufung \\ \midrule
+IEC 61508 & E/E/PE-Systeme allgemein: \T{SIL 1--4} (4 $=$ höchste) \\
+ISO 13849-1 & Maschinen: \T{PL a--e}, Kategorien B, 1--4 \\
+\end{ztab}
+\begin{formel}[Grundprinzip]
+\T{Redundanz} (1oo2): zwei Kanäle/Controller rechnen und vergleichen
+sich gegenseitig. Abweichung \ra \T{Fail-Safe}: sicherer Zustand
+(abschalten statt fehlerhaft weiterlaufen).
+\T{Diagnosedeckungsgrad}: wie viele Fehler erkannt werden.
+\T{Common Cause Failure}: eine Ursache (Überspannung) darf nicht beide
+Kanäle gleichzeitig ausschalten \ra getrennte Versorgung.
+\end{formel}
+
+\subsection{TwinSAFE-Klemmen}
+\begin{ztab}{@{}lX@{}}
+EL6900 & TwinSAFE-Logic: „zweite SPS“ für Safety, Programm läuft auf
+  \emph{zwei} Controllern, Ergebnisse verglichen; bis 128 Verbindungen;
+  SIL 3 / PL e \\
+EL1904 & 4 sichere Eingänge, zwei Controller mit eigener Versorgung,
+  Testpulse erkennen Drahtbruch (nur mit NC-Kontakten, \emph{Sensortest
+  active}) \\
+EL2904 & 4 sichere Ausgänge, 24\,V, 0.5\,A je Kanal, doppelt ausgeführt \\
+\end{ztab}
+Gelb markiert, Bezeichnung \R{x9xx}. Sicherheitsprotokoll eingebettet im
+normalen EtherCAT-Telegramm \ra gleicher Bus wie Standard-Klemmen.
+
+\begin{rezept}[Safety-Projekt (AS 9)]
+\begin{enumerate}
+\item E/A scannen: EL6900, EL1904, EL2904 sichtbar.
+\item SAFETY \ra neues TwinSAFE-Projekt, Target \emph{Hardware Safety
+  PLC}, Physical Device $=$ EL6900.
+\item TwinSAFE-Gruppe, Alias Devices EL1904/EL2904 hinzufügen und mit
+  der Klemme verbinden.
+\item Logik in der \R{.sal}-Datei \T{grafisch} aus validierten
+  \R{safe}-Bausteinen (nicht ST); Ein-/Ausgänge benennen, im Variable
+  Mapping verknüpfen.
+\end{enumerate}
+\end{rezept}
+\begin{falle}[Not-Aus \ra Relais]
+Normalzustand: Not-Aus nicht gedrückt, Relais \emph{an}. Ruhestromprinzip:
+Drahtbruch oder Stromausfall muss wie „Not-Aus gedrückt“ wirken
+(NC-Kontakt, Testpulse) \ra Relais \emph{aus}. Nach dem Lösen nicht
+automatisch wieder anlaufen: Quittierung (Reset-Taster) verlangen.
+\end{falle}

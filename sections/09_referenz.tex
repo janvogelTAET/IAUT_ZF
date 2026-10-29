@@ -1,0 +1,71 @@
+% !TEX root = ../main.tex
+% ---------------------------------------------------------------------
+%  Referenz: Fragebogen, Formeln, Prüfungs-Checkliste
+% ---------------------------------------------------------------------
+\vlsec{cREF}{REF}{Prüfungsreferenz}
+\label{sec:referenz}
+
+\subsection{Fragebogen MEP HS24 mit Begründung}
+\label{sec:quiz}
+\begin{ztab}{@{}rXl@{}}
+\# & Aussage \ra Begründung & \\ \midrule
+1 & ST + \emph{fünf weitere} Sprachen \ra es sind 5 insgesamt (ST + 4) & \NEIN \\
+2 & IEC 61131-3 nur von Beckhoff \ra herstellerübergreifende Norm & \NEIN \\
+3 & Zuerst Ausgänge setzen, dann Eingänge lesen \ra umgekehrt (PAE, Programm, PAA) & \NEIN \\
+4 & 200\,$\mu$s Abtastzeit mit TwinCAT/EtherCAT \ra EtherCAT $\le100\,\mu$s, Tasks 300\,$\mu$s im Labor & \JA \\
+5 & TwinCAT-Programm wird immer zyklisch aufgerufen \ra jedes PROGRAM hängt an einem Task & \JA \\
+6 & EtherCAT ist TCP/IP-basiert \ra eigener Ethertype auf Schicht 2 & \NEIN \\
+7 & FB mit Gedächtnis muss nicht instanziiert werden \ra muss & \NEIN \\
+8 & GVL nur für Klemmen-Variablen \ra auch Konstanten, globale Daten & \NEIN \\
+9 & ENUM beginnt immer bei 0 \ra Werte frei setzbar (\R{JANUAR:=1}) & \NEIN \\
+10 & Zykluszeit mehrere Sekunden möglich \ra Vielfaches der Basiszeit; \emph{nicht im Skript bestätigt} & (Ja?) \\
+11 & Verschiedene Zykluszeiten für verschiedene Programme \ra mehrere Tasks & \JA \\
+12 & TwinCAT ist ein Feldbus \ra Software; Feldbus ist EtherCAT & \NEIN \\
+13 & Zykluszeit ohne Einfluss auf CPU-Last \ra kürzer $=$ mehr Last & \NEIN \\
+14 & Mehrere INT aus FB nur via Struktur/Array \ra mehrere \R{VAR\_OUTPUT} & \NEIN \\
+15 & Mehrere Tasks mit gleicher Priorität \ra jede Stufe nur ein Task & \NEIN \\
+16 & FUNCTION speichert Inhalt zwischen Aufrufen \ra kein Gedächtnis & \NEIN \\
+\end{ztab}
+\begin{falle}[Wertung]
+$+1$ richtig, $-1$ falsch, 0 leer. Frage 10 ist nicht durch die
+Unterlagen belegt \ra im Zweifel leer lassen.
+\end{falle}
+
+\subsection{Alle Formeln auf einen Blick}
+\begin{ztab}{@{}lX@{}}
+Analog-Eingang & $U=\frac{\text{INT}}{32767}\cdot10$\,V \\
+Analog-Ausgang & $\text{INT}=\text{REAL\_TO\_INT}(U/10\cdot32767)$ \\
+Lineare Kennlinie & $p=p_1+(U-U_1)\frac{p_2-p_1}{U_2-U_1}$ \\
+Blinken mit $f$ & Timer-\R{PT} $=\frac{1}{2f}$ (3\,Hz \ra 167\,ms) \\
+PWM & $N_2=T_0/T$, $N_1=\text{Duty}\cdot N_2$ \\
+Mittelwert rekursiv & $M(k)=M(k-1)+\frac1N(y(k)-y(k-N-1))$ \\
+Forgetting Factor & $M(k)=\lambda M(k-1)+(1-\lambda)y(k)$ \\
+Euler rückwärts & $s=\frac{1-z^{-1}}{T}$ \\
+Tustin & $s=\frac2T\frac{1-z^{-1}}{1+z^{-1}}$ \\
+PT1 diskret & $y(k)=\frac{\tau}{\tau+T}y(k-1)+\frac{T}{\tau+T}u(k)$ \\
+I Trapez & $u_i(k)=u_i(k-1)+\frac{K_pT}{2T_i}(e(k)+e(k-1))$ \\
+D gefiltert & $u_d(k)=\frac{T_d}{T_d+NT}u_d(k-1)+\frac{K_pT_dN}{T_d+NT}\Delta e$ \\
+ARW & $+\frac{T}{T_r}(u_{\text{sat}}-u)$ im I-Anteil, $T_r=\sqrt{T_iT_d}$ \\
+Stabilität diskret & alle Pole $|p|<1$ \\
+Abtasttheorem & $\omega_s>2\omega_{\max}$; $T\le0.1\,T_1$ \\
+Task-Last & $\sum\frac{\text{Laufzeit}}{\text{Zykluszeit}}$; Basiszeit $=$ ggT \\
+Shift & \R{SHR(x,n)} $=x/2^n$, \R{SHL(x,n)} $=x\cdot2^n$ \\
+\end{ztab}
+
+\subsection{Code auf Papier -- Checkliste}
+\begin{rezept}[Bevor du abgibst]
+\begin{enumerate}
+\item Jede Variable deklariert? E/A mit \R{AT \%I*}/\R{AT \%Q*},
+  in GVL mit \R{GVL\_IO.}-Präfix verwendet?
+\item Typen passen? \R{INT\_TO\_REAL} vor dem Rechnen, \R{10.0} statt
+  \R{10}, Rückgabetyp der Funktion gesetzt.
+\item FB \emph{instanziiert} und \emph{jeden Zyklus} aufgerufen? Timer
+  und Flanken ausserhalb von \R{IF}/\R{CASE}-Zweigen.
+\item Taster in Transitionen über Flanke (\R{R\_TRIG}/EdgeDetector).
+\item Speicher nachgeschoben ($y_2:=y_1$, dann $y_1:=y$)?
+\item Division durch 0 abgefangen, \R{WHILE} vermieden.
+\item Jedes \R{IF} mit \R{END\_IF}, \R{CASE} mit \R{END\_CASE}, Semikolons.
+\item Kurz kommentieren, \emph{warum} (z.\,B.\ „FUNCTION reicht, kein
+  Gedächtnis“) -- Begründungen geben Punkte.
+\end{enumerate}
+\end{rezept}

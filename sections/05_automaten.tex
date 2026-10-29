@@ -1,0 +1,190 @@
+% !TEX root = ../main.tex
+% ---------------------------------------------------------------------
+%  B5 -- Endliche Automaten (Skript Kap. 5, Anhang C.12; AS 4; MEP HS24)
+% ---------------------------------------------------------------------
+\vlsec{cB5}{B5}{Endliche Automaten}
+\label{sec:automaten}
+
+\SW{Zustand} Situation, in der sich das System befindet (Init,
+Automatik, Hand, Störung). Immer \emph{genau ein} aktiver Zustand.
+\SW{Transition} Bedingung für den Wechsel: Sensor, Tastendruck (Flanke!),
+abgelaufener Timer, Kombination davon.
+\SW{Diagramm} Zustände als Kreis, Transitionen als Pfeil mit Bedingung,
+definierter Startzustand (Init). Steuerung, keine Regelung.
+
+\subsection{Zwei Implementierungen in TwinCAT}
+\begin{ztab}{@{}lX@{}}
+UML-Statechart & grafisch, pro Zustand \T{ENTRY} (1x beim Eintreten),
+  \T{DO} (zyklisch, solange aktiv), \T{EXIT} (1x beim Verlassen);
+  Transitionen mit Bedingung. Gut für Kommunikation. \\
+ST: ENUM + CASE & Zustandsvariable vom ENUM-Typ, \R{CASE} springt in den
+  Codeblock, Wechsel durch Zuweisung. Prüfungsrelevant. \\
+\end{ztab}
+
+\begin{rezept}[Automat in ST -- Grundschema]
+\label{rez:automat}
+\begin{enumerate}
+\item ENUM mit allen Zuständen unter DUTs (Startzustand als Initialwert).
+\item Eingänge einlesen und vorverarbeiten (Flanken, Timer \emph{vor} dem
+  \R{CASE} aufrufen).
+\item \R{CASE eState OF}: pro Zustand Aktionen, am Ende Transition prüfen
+  und \R{eState := NEU;} setzen.
+\item Ausgänge \emph{nach} dem \R{CASE} aus dem Zustand ableiten
+  (\R{bMotor := eState = E\_RUN;}) \ra kein Ausgang bleibt hängen.
+\item Logik in einen \R{FUNCTION\_BLOCK}, in \R{MAIN} instanziieren
+  \ra mehrfach verwendbar.
+\end{enumerate}
+\end{rezept}
+\begin{falle}[Typische Fehler]
+Taster ohne Flanke abfragen \ra Zustand rast in einem Zyklus durch
+mehrere Zustände. Timer nur im \R{CASE}-Zweig aufrufen \ra läuft nicht
+weiter. Störung nur in einem Zustand prüfen \ra wird übersehen (globale
+Transition \emph{vor} dem \R{CASE}).
+\end{falle}
+
+\subsection{MEP HS24: Förderband}
+\label{bsp:foerderband}
+\begin{center}
+\begin{tikzpicture}[>=Stealth, node distance=8mm and 13mm,
+  every state/.style={minimum size=9mm, inner sep=1pt, font=\scriptsize\bfseries,
+    draw=cB5, fill=cB5!8}, every edge/.style={draw, ->}, font=\tiny]
+\node[state, initial, initial text=] (I) {INIT};
+\node[state, right=of I] (R) {READY};
+\node[state, right=of R] (U) {RUNNING};
+\node[state, below=of U] (S) {STOPPED};
+\node[state, below=of R] (F) {FAULT};
+\path (I) edge node[above] {sofort} (R)
+      (R) edge node[above] {Start} (U)
+      (U) edge node[right] {Stop} (S)
+      (S) edge node[above, sloped] {Stop los} (R)
+      (F) edge node[left] {Reset} (R);
+\node[font=\tiny, below=1mm of F] {von jedem Zustand: FaultSignal \ra FAULT};
+\end{tikzpicture}
+\end{center}
+\begin{lstlisting}
+TYPE EN_FOERDERBAND_ZUSTAND :
+  (INIT, READY, RUNNING, STOPPED, FAULT);
+END_TYPE
+
+FUNCTION_BLOCK FB_FOERDERBAND_LOGIK
+VAR_INPUT
+  StartButton, StopButton, FaultSignal, ResetButton : BOOL;
+END_VAR
+VAR_OUTPUT ConveyorOn, FaultIndicator : BOOL; END_VAR
+VAR
+  eZustand : EN_FOERDERBAND_ZUSTAND := INIT;
+  rtStart, rtReset : R_TRIG;
+END_VAR
+
+rtStart(CLK := StartButton);
+rtReset(CLK := ResetButton);
+IF FaultSignal THEN eZustand := FAULT; END_IF  // gilt überall
+
+CASE eZustand OF
+  INIT:    eZustand := READY;
+  READY:   IF rtStart.Q THEN eZustand := RUNNING; END_IF
+  RUNNING: IF StopButton THEN eZustand := STOPPED; END_IF
+  STOPPED: IF NOT StopButton THEN eZustand := READY; END_IF
+  FAULT:   IF rtReset.Q AND NOT FaultSignal THEN
+             eZustand := READY;
+           END_IF
+END_CASE
+
+ConveyorOn     := (eZustand = RUNNING);
+FaultIndicator := (eZustand = FAULT);
+\end{lstlisting}
+\begin{lstlisting}
+PROGRAM MAIN
+VAR
+  bStart  AT %I* : BOOL;   bStop  AT %I* : BOOL;
+  bFault  AT %I* : BOOL;   bReset AT %I* : BOOL;
+  bMotor  AT %Q* : BOOL;   bLampe AT %Q* : BOOL;
+  fbBand1 : FB_FOERDERBAND_LOGIK;
+END_VAR
+fbBand1(StartButton := bStart, StopButton := bStop,
+        FaultSignal := bFault, ResetButton := bReset,
+        ConveyorOn => bMotor, FaultIndicator => bLampe);
+\end{lstlisting}
+\begin{formel}[(e) Zweites Förderband]
+\label{falle:instanz}
+Zweite \T{Instanz} \R{fbBand2 : FB\_FOERDERBAND\_LOGIK;} plus eigene
+E/A-Variablen (\R{AT \%I*}/\R{AT \%Q*}) deklarieren, verknüpfen und
+\R{fbBand2(...)} aufrufen. Der FB-Code bleibt unverändert -- jede Instanz
+hat ihren eigenen \R{eZustand}. Genau darum gehört die Logik in einen FB
+und nicht ins Programm.
+\end{formel}
+
+\subsection{MEP HS24: Ampel für eine Kreuzung}
+\label{bsp:ampel}
+\begin{lstlisting}
+TYPE EN_FARBEN        : (ROT, GELB, GRUEN);      END_TYPE
+TYPE EN_BETRIEBSMODUS : (AUTOMATIK, MANUELL);    END_TYPE
+TYPE EN_PHASE : (A_GRUEN, A_GELB, B_GRUEN, B_GELB); END_TYPE
+
+VAR_GLOBAL   // GVL_IO
+  bA_Rot AT %Q* : BOOL; bA_Gelb AT %Q* : BOOL; bA_Gruen AT %Q* : BOOL;
+  bB_Rot AT %Q* : BOOL; bB_Gelb AT %Q* : BOOL; bB_Gruen AT %Q* : BOOL;
+  bTA_Rot AT %I* : BOOL; bTA_Gelb AT %I* : BOOL; bTA_Gruen AT %I* : BOOL;
+  bTB_Rot AT %I* : BOOL; bTB_Gelb AT %I* : BOOL; bTB_Gruen AT %I* : BOOL;
+  bHand   AT %I* : BOOL;              // Wahlschalter Handbetrieb
+END_VAR
+
+PROGRAM MAIN
+VAR
+  eModus  : EN_BETRIEBSMODUS := AUTOMATIK;
+  arAmpel : ARRAY[1..2] OF EN_FARBEN := [ROT, ROT];
+  ePhase  : EN_PHASE := A_GRUEN;
+  tonGruen, tonGelb : TON;
+END_VAR
+
+IF GVL_IO.bHand THEN eModus := MANUELL; ELSE eModus := AUTOMATIK; END_IF
+
+CASE eModus OF
+AUTOMATIK:
+  tonGruen(IN := (ePhase = A_GRUEN) OR (ePhase = B_GRUEN), PT := T#10S);
+  tonGelb (IN := (ePhase = A_GELB)  OR (ePhase = B_GELB),  PT := T#3S);
+  CASE ePhase OF
+    A_GRUEN: arAmpel[1] := GRUEN; arAmpel[2] := ROT;
+             IF tonGruen.Q THEN ePhase := A_GELB; END_IF
+    A_GELB:  arAmpel[1] := GELB;  arAmpel[2] := ROT;
+             IF tonGelb.Q THEN ePhase := B_GRUEN; END_IF
+    B_GRUEN: arAmpel[1] := ROT;   arAmpel[2] := GRUEN;
+             IF tonGruen.Q THEN ePhase := B_GELB; END_IF
+    B_GELB:  arAmpel[1] := ROT;   arAmpel[2] := GELB;
+             IF tonGelb.Q THEN ePhase := A_GRUEN; END_IF
+  END_CASE
+MANUELL:   // Grün nur, wenn die andere Ampel nicht grün ist
+  IF GVL_IO.bTA_Rot THEN arAmpel[1] := ROT;
+  ELSIF GVL_IO.bTA_Gelb THEN arAmpel[1] := GELB;
+  ELSIF GVL_IO.bTA_Gruen AND arAmpel[2] <> GRUEN THEN arAmpel[1] := GRUEN;
+  END_IF
+  IF GVL_IO.bTB_Rot THEN arAmpel[2] := ROT;
+  ELSIF GVL_IO.bTB_Gelb THEN arAmpel[2] := GELB;
+  ELSIF GVL_IO.bTB_Gruen AND arAmpel[1] <> GRUEN THEN arAmpel[2] := GRUEN;
+  END_IF
+END_CASE
+
+GVL_IO.bA_Rot := arAmpel[1] = ROT;  GVL_IO.bA_Gelb := arAmpel[1] = GELB;
+GVL_IO.bA_Gruen := arAmpel[1] = GRUEN;
+GVL_IO.bB_Rot := arAmpel[2] = ROT;  GVL_IO.bB_Gelb := arAmpel[2] = GELB;
+GVL_IO.bB_Gruen := arAmpel[2] = GRUEN;
+\end{lstlisting}
+\begin{falle}[Ampel: was man begründen sollte]
+Zwei Timer reichen, weil zwischen zwei Grünphasen immer eine Gelbphase
+liegt (\R{IN} fällt dazwischen ab \ra Reset). Rot einer Ampel dauert hier
+Grün $+$ Gelb der anderen $=13$\,s; exakt 10\,s Rot ginge nur mit
+kürzerer Grünphase der Gegenrichtung. „Nie beide grün“ ist in Automatik
+durch die Phasen garantiert, im Handbetrieb durch die Verriegelung.
+\end{falle}
+
+\subsection{Weitere Automaten aus AS 4}
+\SW{Safe} Init (Code-Array füllen) \ra Close (Zähler/Lampen reset) \ra
+CheckDigit (nur bei \R{risingEdge}, 4 Tasten, \R{correctCounter},
+\R{currentIndex}) \ra Open (grün, \R{lightDuration} 5\,s) bzw.\ WrongCode
+(rot, 5\,s) \ra Close. Zusatz: Doppelklick blau bricht ab; Code im Zustand
+Open mit beiden Tasten neu programmieren.
+\SW{Ampel-FB} Eingänge \R{clear\_road}, \R{block\_road},
+\R{disable\_system}; Init \ra Red \ra(clear) Red\&Yellow \ra(2\,s) Green
+\ra(block) Yellow \ra(5\,s) Red; Disabled: gelb blinkt 1\,s, zurück zu Red,
+wenn \R{disable} weg. Als FB \ra Kreuzung $=$ 4 Instanzen, Phase A
+(Ampel 1+3, 5\,s), Phase B (2+4, 8\,s), dazwischen sicherer Wechsel.

@@ -1,0 +1,113 @@
+% !TEX root = ../main.tex
+% ---------------------------------------------------------------------
+%  B1 -- Grundlagen der Automatisierung (Skript Kap. 1, Folien)
+% ---------------------------------------------------------------------
+\vlsec{cB1}{B1}{Grundlagen der Automatisierung}
+\label{sec:grundlagen}
+
+\SW{Definition} (DIN 19222) Ausrüsten einer Einrichtung, so dass sie
+\emph{ganz oder teilweise ohne Mitwirkung des Menschen} geschieht. Der
+Mensch legt fest \emph{was} geschieht (Programm), nicht mehr \emph{wie}.
+
+\SW{Vier Gebiete} \T{Maschinen}- (Presse, Roboter), \T{Anlagen}-
+(Kraftwerk, Chemie, mehrere vernetzte Regelkreise), \T{Gebäude}- (Heizung,
+Lüftung, Licht), \T{Geräte}automatisierung (Insulinpumpe, Saugroboter).
+Modul-Fokus: Maschinen und Anlagen.
+
+\subsection{Automatisierungspyramide}
+\begin{ztab}{@{}llX@{}}
+Ebene & System & Zeit \\ \midrule
+Firma & ERP & Tage--Monate \\
+Produktion & MES & Stunden--Schichten \\
+Anlage & Prozessleitsystem, SCADA & s--min \\
+System & SPS (Station, Achse) & Sekunden \\
+Sensor/Aktor & Regelung (PID) & ms \\
+\end{ztab}
+Nach \emph{unten}: mehr Datenpunkte, schnellere Reaktion. Nach \emph{oben}:
+höherer Aggregationsgrad (Tausende Sensorwerte \ra eine Kennzahl).
+
+\begin{formel}[Steuern vs.\ Regeln]
+\T{Steuerung} = offener Wirkungsablauf (Steuerkette): Eingang beeinflusst
+Ausgang, \emph{keine Rückmeldung}, ob das Ziel erreicht wurde
+(Ablaufsteuerung, Zustandsautomat).\\
+\T{Regelung} = geschlossener Wirkungskreis: Istwert wird gemessen, mit
+Sollwert verglichen, die Regelabweichung wirkt zurück (PID).
+\end{formel}
+\SW{Beispiel Abkantpresse} Stempel über 2 Hydraulikzylinder geregelt;
+Biegehilfen: 3 Achsen $\times$ 3 Kaskadenregler (Strom, Geschwindigkeit,
+Position) $=9$ PID. Dazu reine Steuerung: Bedienung, HMI, Rezepturen,
+Produktionsdaten, Safety (Lichtvorhang, Zweihand).
+
+\subsection{Aufbau eines Automatisierungssystems}
+HMI (Mensch) \ra SPS \ra Feldbus \ra Antriebe, Aktoren, Sensoren.
+\begin{ztab}{@{}lX@{}}
+mit Echtzeit & Regler, Prozessabläufe \\
+ohne Echtzeit & HMI, Produktionsplanung, Archivierung \\
+\end{ztab}
+\SW{Anforderungen} Echtzeitfähigkeit (BS, Speicher), E/A von
+Prozesssignalen, Sicherheit/Zuverlässigkeit (Redundanz), Resistenz gegen
+Umwelt (Gehäuse, Schaltschrank).
+
+\SW{Bauformen} Control Panel (mit Bildschirm), Compact (Hutschiene, wie
+CX im Labor), 19''-Rack-Industrie-PC.
+\T{SPS}: Wenn-Dann-Logik + Zustandsspeicher. \T{CNC}: Bahnregelung,
+CAD-Import (IGES/DXF). \T{Industrie-PC}: gehärteter PC + Soft-SPS
+(TwinCAT) \ra SPS und HMI in einem.
+
+\SW{Schaltschrank} Hauptschalter \ra Sicherungsautomaten \ra Netzteil
+(230/400\,V AC \ra 24\,V DC) \ra SPS \ra E/A-Klemmen \ra
+Frequenzumrichter (drehzahlvariable Antriebe) \ra Schütze/Relais (grosse
+Lasten, trennen Steuer- von Leistungsebene) \ra Not-Aus-Kreis
+(Sicherheitsrelais/Safety-SPS). Schutzart z.\,B.\ IP54.
+
+\SW{I/O-Baum} \T{Online} (Scan der laufenden Hardware) oder \T{Offline}
+(Klemmen aus Katalog, ESI-Dateien, nach Stückliste). EPLAN-Kopplung:
+TF6360 importiert das Elektroschema.
+
+\subsection{Feldbusse}
+\label{sec:feldbus}
+Gemeinsame Leitung statt Einzelverdrahtung (zentralisiert).
+\begin{ztab}{@{}XX@{}}
+Vorteile & Nachteile \\ \midrule
+weniger Verkabelung & komplexer (Protokoll, Adressen) \\
+einfach erweiterbar & teurer, Bus-Analyzer nötig \\
+ & ev.\ längere Reaktionszeit \\
+\end{ztab}
+\SW{Generationen} klassisch: Profibus (RS-485), CAN/CANopen (Auto,
+J1939). Ethernet-basiert: \T{EtherCAT} (Beckhoff), Profinet, EtherNet/IP,
+SERCOS III. Gebäude: LON, EIB/KNX.
+
+\begin{formel}[EtherCAT vs.\ TCP/IP]
+\T{Gleiches Kabel} (Schicht 1, Cat5/RJ45, 100BASE-TX), aber
+\emph{kein} IP und \emph{kein} TCP/UDP im Echtzeitpfad: eigener Ethertype
+direkt auf Schicht 2, Verarbeitung on-the-fly, feste projektierte
+Teilnehmer-Reihenfolge statt Routing, kein CSMA/CD \ra deterministisch,
+$\mu$s bis wenige ms.
+\end{formel}
+\SW{Topologien} Linie (bis 100\,m zwischen Teilnehmern), Baum/Abzweig,
+Stern (Junctions), \T{Ring mit Kabelredundanz} (letzter Teilnehmer zurück
+zum Master: Kabelbruch \ra Gegenrichtung übernimmt). Fremdgeräte direkt
+mit EtherCAT (Schunk-Greifer, Bota-Kraftsensor).
+
+\subsection{Programmiersprachen IEC 61131-3}
+\label{sec:sprachen}
+\begin{ztab}{@{}llX@{}}
+Sprache & Typ & Merkmal \\ \midrule
+AWL / IL & textuell & SPS-Assembler, keine Schleifen, veraltet \\
+KOP / LD & grafisch & Ersatz für Relaislogik, nicht für Komplexes \\
+FBS / FBD & grafisch & Bit-Verknüpfungen, Datenfluss übersichtlich \\
+\T{ST} & textuell & Hochsprache (Pascal/C), Schleifen, in Europa verbreitet \\
+AS / SFC & grafisch & Zustandsabläufe, gut lesbar \\
+\end{ztab}
+\begin{falle}[Anzahl Sprachen]
+Es sind \T{fünf} Sprachen \emph{insgesamt} -- ST plus \emph{vier} weitere.
+IEC 61131-3 ist die einzige weltweit gültige Norm und
+herstellerübergreifend (nicht nur Beckhoff).
+\end{falle}
+\SW{Warum ST} Filter, PID, Automaten brauchen Schleifen, Arrays, REAL,
+Fallunterscheidungen. Reiner Text \ra Diff, Git, Code-Review.
+\SW{Ausblick} \T{EN 61499}: objektorientierte Weiterentwicklung, verteilte
+ereignisgesteuerte FBs über mehrere Steuerungen. \T{Codegenerierung}:
+Simulink PLC Coder, TwinCAT-Simulink, B\&R Automation Studio --
+validierter Regler ohne Abschreibfehler, aber weniger Kontrolle über den
+Code. Direkter vs.\ indirekter Reglerentwurf siehe \ref{sec:pid}.
