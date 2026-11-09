@@ -1,6 +1,6 @@
 # IAUT Automatisierung Zusammenfassung (HS26) – LaTeX-Quelle
 
-Blöcke B1–B8 für die MEP IAUT (Teil Automatisierung). A4 hoch, 2 Spalten, 8pt, aktuell 6 Seiten.
+Blöcke B1–B8 für die MEP IAUT (Teil Automatisierung). A4 hoch, 2 Spalten, 8pt, aktuell 7 Seiten.
 Die MEP erlaubt alle Unterlagen in Papierform, es gibt also kein Seitenlimit.
 
 ## Bauen
@@ -23,7 +23,7 @@ Die MEP erlaubt alle Unterlagen in Papierform, es gibt also kein Seitenlimit.
 | `sections/05_automaten.tex` | B5: Zustandsautomaten, ENUM+CASE-Schema, Förderband und Ampel (MEP HS24) komplett |
 | `sections/06_tasks.tex` | B6: Tasks, Prioritäten, Basiszeit, EtherCAT, WC, Sync Units |
 | `sections/07_pid.tex` | B7: PID diskretisieren, PT1T2-Strecke, Init/Run, PID-FB, Anti-Reset-Windup |
-| `sections/08_safety.tex` | B8: SIL/PL, Redundanz, TwinSAFE-Klemmen |
+| `sections/08_safety.tex` | B8: Maschinenverordnung/CE, Normenpyramide, Risikobeurteilung (3-Stufen), PLr/PL/SIL, STO & Co., FSoE/Black Channel, TwinSAFE-Klemmen, Safety-Projekt |
 | `sections/09_referenz.tex` | Ja/Nein-Fragebogen HS24 mit Begründung, alle Formeln, Checkliste für Code auf Papier |
 | `sections/10_register.tex` | Stichwortregister (erzeugt, siehe unten) |
 | `figures/` | Bilder (PNG), via `\fig{...}` |
@@ -33,7 +33,7 @@ Block weglassen: Zeile auskommentieren.
 
 ## Wie man etwas findet
 1. **Farbe** – jeder Block hat eine eigene Balkenfarbe (B1 blau … B8 magenta).
-2. **Abschnitt 10** – Stichwortregister, 77 Begriffe → Abschnittsnummer.
+2. **Abschnitt 10** – Stichwortregister, 86 Begriffe → Abschnittsnummer.
 3. **Seite 1** – Tabelle „Wenn die Aufgabe lautet …“ geht von der Aufgabenstellung direkt zur Nummer.
 
 ## Eigene Befehle (in `main.tex` definiert)
@@ -74,7 +74,7 @@ Standardpakete einer vollen TeX-Distribution. Nicht ganz minimal sind
 `lastpage`, `tikz` (Zustandsdiagramm). MiKTeX installiert sie beim ersten Build automatisch nach.
 
 ## Stand der Quellen
-`IAS_Skript_v1.4` (Kap. 1–10, Anhänge A–F), `IAS_Labor_Aufgabenserie1–8` (7 in v3),
+`IAS_Skript_v1.4` (Kap. 1–10, Anhänge A–F), `IAS_Skript_v1.5` (Kap. 10 Safety), `IAS_Labor_Aufgabenserie1–8` (7 in v3),
 `IAS_SPSProgrammierung_Folien`, `IAS_ReglerDiskretisierung_Folien`,
 `DigitaleRegelungSkript` (Kap. 2–4), `MEP__IAUT__HS24`, `IAUT_Automation_MusterPruefung`,
 Musterlösungen Aufgabenserie 2 und 3, Laborversuch Drehzahl.

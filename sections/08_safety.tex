@@ -1,6 +1,6 @@
 % !TEX root = ../main.tex
 % ---------------------------------------------------------------------
-%  B8 -- Funktionale Sicherheit, TwinSAFE (Skript Kap. 10; AS 9)
+%  B8 -- Funktionale Sicherheit, TwinSAFE (Skript v1.5 Kap. 10; AS 9)
 % ---------------------------------------------------------------------
 \vlsec{cB8}{B8}{Funktionale Sicherheit und TwinSAFE}
 \label{sec:safety}
@@ -8,21 +8,152 @@
 \SW{Funktionale Sicherheit} Die Steuerung schützt Personen und Umwelt,
 nicht nur den Betrieb. Oft sicherer, kontrolliert zu stoppen als einfach
 die Energie zu kappen \ra Not-Halt, Schutztür, Zweihand in die SPS.
-\begin{ztab}{@{}lX@{}}
-Norm & Einstufung \\ \midrule
-IEC 61508 & E/E/PE-Systeme allgemein: \T{SIL 1--4} (4 $=$ höchste) \\
-ISO 13849-1 & Maschinen: \T{PL a--e}, Kategorien B, 1--4 \\
+Roter Faden des Kapitels: \T{Gesetz} \ra \T{Normen} \ra
+\T{Risikobeurteilung} \ra \T{PL/SIL} \ra \T{TwinSAFE}.
+
+\subsection{Rechtlicher Rahmen: Maschinenverordnung, CE}
+\label{sec:ce}
+\SW{Maschinenverordnung} (EU) 2023/1230, gilt ab \T{20.\,1.\,2027} und
+löst die Maschinenrichtlinie 2006/42/EG ab. Als \emph{Verordnung} gilt
+sie direkt in allen Mitgliedstaaten (keine nationale Umsetzung).
+Pflichten des Herstellers:
+\begin{itemize}\setlength\itemsep{0pt}
+\item \T{Risikobeurteilung} durchführen, Maschine nach den grundlegenden
+  Anforderungen (Anhang III) konstruieren,
+\item \T{technische Unterlagen} (Zeichnungen, Schaltpläne,
+  Risikobeurteilung, angewandte Normen) + Konformitätsbewertung,
+\item \T{EU-Konformitätserklärung} ausstellen, \T{CE} anbringen,
+\item Betriebsanleitung mitliefern; Unterlagen \T{mind.\ 10 Jahre}
+  aufbewahren.
+\end{itemize}
+\SW{Interne Fertigungskontrolle} reicht für die meisten Maschinen
+(auch das Test Rig): Hersteller erklärt Konformität selbst. Nur
+explizit gelistete Maschinen mit erhöhtem Risiko (bestimmte Pressen,
+Sägen) \ra \T{benannte Stelle} (notified body) nötig.
+\begin{falle}[CE ist kein Prüfsiegel]
+CE $=$ \emph{Eigenerklärung} des Herstellers gegenüber dem Markt, kein
+behördliches Prüfzeichen, keine Qualitätsauszeichnung. Die eigentliche
+Arbeit steckt in Risikobeurteilung und Massnahmen.
+\end{falle}
+
+\subsection{Normenpyramide (Typ A, B, C)}
+\label{sec:normen}
+Verordnung nennt nur Schutzziele. \T{Harmonisierte Normen} korrekt
+angewandt \ra \T{Konformitätsvermutung} (gesetzliche Anforderung gilt
+als erfüllt).
+\begin{ztab}{@{}l>{\raggedright}p{0.36\linewidth}X@{}}
+Typ & Geltung & Beispiele \tabularnewline \midrule
+A & Grundbegriffe, Methodik; \emph{jede} Maschine &
+  ISO 12100 (Risikobeurteilung) \tabularnewline
+B1 & ein Sicherheits\-aspekt, maschinenübergreifend &
+  ISO 13849-1 (Steuerung), ISO 13850 (Not-Halt) \tabularnewline
+B2 & eine Art Schutz\-einrichtung &
+  IEC 61496 (Lichtvorhang), ISO 13856 (Schaltmatte) \tabularnewline
+C & eine konkrete Maschinenart, detailliert &
+  ISO 10218-1 (Roboter), EN 12622 (Abkantpresse) \tabularnewline
 \end{ztab}
-\begin{formel}[Grundprinzip]
-\T{Redundanz} (1oo2): zwei Kanäle/Controller rechnen und vergleichen
-sich gegenseitig. Abweichung \ra \T{Fail-Safe}: sicherer Zustand
-(abschalten statt fehlerhaft weiterlaufen).
-\T{Diagnosedeckungsgrad}: wie viele Fehler erkannt werden.
-\T{Common Cause Failure}: eine Ursache (Überspannung) darf nicht beide
-Kanäle gleichzeitig ausschalten \ra getrennte Versorgung.
+\begin{formel}[Vorrangregel]
+Gibt es eine passende \T{Typ-C}-Norm, geht sie A/B \emph{vor}. Nur ohne
+C-Norm (Sonderanfertigung, Prototyp): Risikobeurteilung selbst nach
+ISO 12100 + Typ-B-Normen.
 \end{formel}
 
+\subsection{Risikobeurteilung nach ISO 12100}
+\label{sec:risiko}
+Iterativ: \T{Grenzen} der Maschine festlegen (bestimmungsgemässe
+Verwendung, \emph{vorhersehbare Fehlanwendung}, alle Lebensphasen vom
+Transport bis zur Entsorgung) \ra Gefährdungen identifizieren
+(mechanisch, elektrisch, thermisch \dots) \ra \T{Risiko $=$ f(Schwere,
+Eintrittswahrscheinlichkeit)} \ra mindern \ra neu einschätzen, bis das
+Restrisiko vertretbar ist.
+\begin{rezept}[3-Stufen-Methode (Rangfolge!)]
+\begin{enumerate}
+\item \T{Inhärent sichere Konstruktion}: Gefährdung konstruktiv
+  beseitigen (runde Kanten, keine Quetschstellen) \ra kann nicht umgangen
+  werden, am wirksamsten.
+\item \T{Technische Schutzmassnahmen}: trennend (Zaun, verriegelte Tür)
+  oder nichttrennend (Lichtvorhang, Zweihand) \ra hier setzt
+  \T{funktionale Sicherheit / TwinSAFE} an.
+\item \T{Benutzerinformation}: Warnhinweise, Anleitung, Schulung \ra
+  schwächste Stufe (verlässt sich auf Menschen).
+\end{enumerate}
+\end{rezept}
+Die dokumentierte Risikobeurteilung ist Kern der technischen Unterlagen:
+begründet, warum genau diese Massnahmen reichen.
+
+\subsection{Performance Level (ISO 13849-1) und SIL}
+\label{sec:pl}
+\SW{PLr} (erforderlicher PL, a--e aufsteigend) direkt aus der
+Risikobeurteilung über den \T{Risikographen}:
+\begin{ztab}{@{}lX@{}}
+Parameter & Stufen \\ \midrule
+S Schwere & S1 reversibel, S2 irreversibel/tödlich \\
+F Häufigkeit/Dauer & F1 selten/kurz, F2 häufig/dauernd \\
+P Vermeidbarkeit & P1 möglich, P2 kaum möglich \\
+\end{ztab}
+Erreichter PL der Sicherheitssteuerung aus vier Grössen:
+\begin{ztab}{@{}lX@{}}
+Grösse & Bedeutung \\ \midrule
+Kategorie B, 1--4 & Architektur: B einkanalig ohne Massnahmen \dots\
+  3/4 zweikanalig mit gegenseitiger Überwachung \\
+DC$_\text{avg}$ & Diagnosedeckungsgrad: wie gut Fehler erkannt werden
+  (kein/niedrig/mittel/hoch) \\
+MTTF$_\text{d}$ & mittlere Zeit bis gefährlicher Ausfall (aus B10$_\text{d}$
+  und Schalthäufigkeit) \\
+CCF & Fehler gemeinsamer Ursache beherrscht (z.\,B. Überspannung darf
+  nicht beide Kanäle treffen \ra getrennte Versorgung) \\
+\end{ztab}
+\begin{formel}[Nachweis und Grundprinzip]
+Normkonform, wenn $\text{PL} \ge \text{PL}_\text{r}$.
+\T{Redundanz} (1oo2, one out of two): zwei Kanäle rechnen und
+überwachen sich gegenseitig. Abweichung \ra \T{Fail-Safe}: sicherer
+Zustand (abschalten statt fehlerhaft weiterlaufen).
+\end{formel}
+\begin{ztab}{@{}lX@{}}
+Norm & Einstufung \\ \midrule
+ISO 13849-1 & Maschinen: \T{PL a--e}, Kategorien B, 1--4 \\
+IEC 61508 & E/E/PE-Systeme allgemein: \T{SIL 1--4} (4 $=$ höchste),
+  probabilistisch; für Maschinen abgeleitet: IEC 62061 \\
+\end{ztab}
+Beide Wege gleichwertig, Faustregel \T{PL d $\approx$ SIL 2}
+(PL e $\approx$ SIL 3).
+
+\subsection{Sichere Antriebsfunktionen (IEC 61800-5-2)}
+\label{sec:sto}
+\begin{ztab}{@{}lX@{}}
+Kürzel & Wirkung \\ \midrule
+\T{STO} Safe Torque Off & Energie zum Motor sicher weg, kein
+  Drehmoment. Basisfunktion, reicht für klassischen Not-Halt \\
+SS1 Safe Stop 1 & Bremsrampe, danach automatisch STO \\
+SS2 Safe Stop 2 & Bremsrampe, Antrieb bleibt geregelt (Basis für SOS) \\
+SOS Safe Operating Stop & überwacht erreichten Stillstand, Energie
+  bleibt an \\
+SLS Safely-Limited Speed & Geschwindigkeit sicher begrenzt \\
+SDI Safe Direction & nur eine zulässige Bewegungsrichtung \\
+SLP Safely-Limited Position & Position sicher in zulässigem Bereich \\
+\end{ztab}
+Nutzen: Tür offen \ra statt STO + langem Neuanlauf z.\,B. \T{SLS}
+(langsam weiter, sofort einsatzbereit) \ra Mensch-Maschine-Zusammenarbeit.
+
+\subsection{TwinSAFE und FSoE}
+\label{sec:fsoe}
+\SW{FSoE} Fail Safe over EtherCAT, IEC 61784-3, zertifiziert bis
+\T{SIL 3}. Safety-Daten laufen im \emph{normalen} EtherCAT-Telegramm,
+gleiche Leitungen, gleicher Zyklus wie Standard-Prozessdaten.
+\begin{formel}[Black-Channel-Prinzip]
+Der Bus selbst gilt als unzuverlässig und wird \emph{nicht}
+zertifiziert. Eingebettete Prüfinformation erkennt Verfälschung, Verlust,
+Verzögerung, Vertauschung: \T{Rahmenzähler}, \T{CRC},
+\T{Zeitüberwachung (Watchdog)}. Fehler \ra sicherer Zustand.
+\end{formel}
+Die Logic-Klemme baut zu \emph{jedem} sicheren Teilnehmer eine eigene
+FSoE-Verbindung auf und rechnet die Safety-Applikation lokal,
+\T{unabhängig von der Standard-SPS}. TwinSAFE erzeugt einen Prüfbericht
+mit eindeutiger \T{Projekt-CRC} \ra Nachweis für die technischen
+Unterlagen / Konformitätserklärung (schliesst den Kreis zu~\ref{sec:ce}).
+
 \subsection{TwinSAFE-Klemmen}
+\label{sec:twinsafe}
 \begin{ztab}{@{}lX@{}}
 EL6900 & TwinSAFE-Logic: „zweite SPS“ für Safety, Programm läuft auf
   \emph{zwei} Controllern, Ergebnisse verglichen; bis 128 Verbindungen;
@@ -32,19 +163,22 @@ EL1904 & 4 sichere Eingänge, zwei Controller mit eigener Versorgung,
   active}) \\
 EL2904 & 4 sichere Ausgänge, 24\,V, 0.5\,A je Kanal, doppelt ausgeführt \\
 \end{ztab}
-Gelb markiert, Bezeichnung \R{x9xx}. Sicherheitsprotokoll eingebettet im
-normalen EtherCAT-Telegramm \ra gleicher Bus wie Standard-Klemmen.
+Gelb markiert, Bezeichnung \R{x9xx}. Alle drei bis SIL 3 / PL e.
 
 \begin{rezept}[Safety-Projekt (AS 9)]
 \begin{enumerate}
 \item E/A scannen: EL6900, EL1904, EL2904 sichtbar.
 \item SAFETY \ra neues TwinSAFE-Projekt, Target \emph{Hardware Safety
-  PLC}, Physical Device $=$ EL6900.
+  PLC}, Zielsystem EL6900, Physical Device $=$ EL6900.
 \item TwinSAFE-Gruppe, Alias Devices EL1904/EL2904 hinzufügen und mit
-  der Klemme verbinden.
+  der Klemme verbinden (Physical Device).
 \item Logik in der \R{.sal}-Datei \T{grafisch} aus validierten
-  \R{safe}-Bausteinen (nicht ST); Ein-/Ausgänge benennen, im Variable
-  Mapping verknüpfen.
+  \R{Safe}-Bausteinen der Toolbox (nicht ST), z.\,B. \R{SafeEstop},
+  \R{SafeAnd}. Eingang im Eigenschaftenfenster aktivieren, Variable
+  benennen, im \T{Variable Mapping} mit der Hardware verknüpfen.
+\item Gruppe: \R{ErrAck} und \R{Run} verknüpfen; Safety-Projekt
+  herunterladen (Login an der EL6900, CRC bestätigen), danach
+  Konfiguration aktivieren.
 \end{enumerate}
 \end{rezept}
 \begin{falle}[Not-Aus \ra Relais]
@@ -52,4 +186,17 @@ Normalzustand: Not-Aus nicht gedrückt, Relais \emph{an}. Ruhestromprinzip:
 Drahtbruch oder Stromausfall muss wie „Not-Aus gedrückt“ wirken
 (NC-Kontakt, Testpulse) \ra Relais \emph{aus}. Nach dem Lösen nicht
 automatisch wieder anlaufen: Quittierung (Reset-Taster) verlangen.
+\end{falle}
+\begin{falle}[Aus dem Labor]
+\begin{itemize}\setlength\itemsep{0pt}
+\item \T{FSoE-Adresse} im Alias Device muss dem \T{DIP-Schalter} der
+  Klemme entsprechen (0 geht nicht).
+\item Safety-Klemmen \R{INIT NO\_COMM}, Koppler \R{LNK\_MIS}: Kabel /
+  Versorgung zum Koppler prüfen, danach neu scannen.
+\item „Check product code … found“: echte Topologie $\ne$ Konfiguration
+  \ra neu scannen.
+\item Standard-SPS spricht \emph{nur} über die Standard-Ein/Ausgänge der
+  EL6900 mit der Safety (Status lesen, Quittieren); sie kann die
+  Sicherheitsfunktion nie überstimmen.
+\end{itemize}
 \end{falle}
