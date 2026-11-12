@@ -20,7 +20,7 @@ Die MEP erlaubt alle Unterlagen in Papierform, es gibt also kein Seitenlimit.
 | `sections/02_twincat.tex` | B2: Scan-Zyklus, TwinCAT-Ablauf, `AT %I*/%Q*`, Projektstruktur, ADS, CoE, Remanenz |
 | `sections/03_st.tex` | B3: POU-Typen, Datentypen, Kontrollstrukturen, ENUM/STRUCT, Bitoperationen, Timer, EdgeDetector |
 | `sections/04_filter.tex` | B4: Sensor skalieren, Testsignale/PWM, Mittelwert, Forgetting Factor, Diskretisierung, Butterworth (MEP) |
-| `sections/05_automaten.tex` | B5: Zustandsautomaten, ENUM+CASE-Schema, Förderband und Ampel (MEP HS24) komplett |
+| `sections/05_automaten.tex` | B5: Zustandsautomaten, ENUM+CASE (ohne UML-Statechart), Förderband und Ampel (MEP HS24), Safe und Ampel-FB (AS 4) komplett |
 | `sections/06_tasks.tex` | B6: Tasks, Prioritäten, Basiszeit, EtherCAT, WC, Sync Units |
 | `sections/07_pid.tex` | B7: PID diskretisieren, PT1T2-Strecke, Init/Run, PID-FB, Anti-Reset-Windup |
 | `sections/08_safety.tex` | B8: Maschinenverordnung/CE, Normenpyramide, Risikobeurteilung (3-Stufen), PLr/PL/SIL, STO & Co., FSoE/Black Channel, TwinSAFE-Klemmen, Safety-Projekt |
@@ -33,7 +33,7 @@ Block weglassen: Zeile auskommentieren.
 
 ## Wie man etwas findet
 1. **Farbe** – jeder Block hat eine eigene Balkenfarbe (B1 blau … B8 magenta).
-2. **Abschnitt 10** – Stichwortregister, 86 Begriffe → Abschnittsnummer.
+2. **Abschnitt 10** – Stichwortregister, 88 Begriffe → Abschnittsnummer.
 3. **Seite 1** – Tabelle „Wenn die Aufgabe lautet …“ geht von der Aufgabenstellung direkt zur Nummer.
 
 ## Eigene Befehle (in `main.tex` definiert)

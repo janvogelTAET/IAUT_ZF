@@ -12,14 +12,29 @@ abgelaufener Timer, Kombination davon.
 \SW{Diagramm} Zustände als Kreis, Transitionen als Pfeil mit Bedingung,
 definierter Startzustand (Init). Steuerung, keine Regelung.
 
-\subsection{Zwei Implementierungen in TwinCAT}
-\begin{ztab}{@{}lX@{}}
-UML-Statechart & grafisch, pro Zustand \T{ENTRY} (1x beim Eintreten),
-  \T{DO} (zyklisch, solange aktiv), \T{EXIT} (1x beim Verlassen);
-  Transitionen mit Bedingung. Gut für Kommunikation. \\
-ST: ENUM + CASE & Zustandsvariable vom ENUM-Typ, \R{CASE} springt in den
-  Codeblock, Wechsel durch Zuweisung. Prüfungsrelevant. \\
-\end{ztab}
+\subsection{Umsetzung in ST: ENUM + CASE}
+\SW{ENUM} eigener Datentyp (unter DUTs): Namen statt Zahlen, z.\,B.
+\R{JANUAR..DEZEMBER} $\to$ 1..12. Nur für die Lesbarkeit, im
+Maschinencode stehen Zahlen.
+\SW{CASE} springt abhängig vom Wert einer Variable in einen Codeblock
+(wie \R{switch}); kompakter und lesbarer als eine \R{IF/ELSIF}-Kette.
+Mehrere Werte pro Zweig mit Komma, Rest mit \R{ELSE}.
+\begin{lstlisting}
+TYPE E_Monat : (JANUAR := 1, FEBRUAR, MAERZ, APRIL, MAI, JUNI, JULI,
+                AUGUST, SEPTEMBER, OKTOBER, NOVEMBER, DEZEMBER);
+END_TYPE
+TYPE E_Jahreszeit : (FRUEHLING := 1, SOMMER, HERBST, WINTER); END_TYPE
+
+CASE eMonat OF
+  MAERZ, APRIL, MAI:           eZeit := FRUEHLING;
+  JUNI, JULI, AUGUST:          eZeit := SOMMER;
+  SEPTEMBER, OKTOBER, NOVEMBER: eZeit := HERBST;
+ELSE                           eZeit := WINTER;
+END_CASE
+\end{lstlisting}
+\SW{Automat} Zustandsvariable vom ENUM-Typ hält den aktuellen Zustand,
+\R{CASE} springt in dessen Codeblock, Zustandswechsel $=$ einfache
+Zuweisung \R{eState := NEU;} \ra wirkt ab dem nächsten Zyklus.
 
 \begin{rezept}[Automat in ST -- Grundschema]
 \label{rez:automat}
@@ -177,14 +192,125 @@ kürzerer Grünphase der Gegenrichtung. „Nie beide grün“ ist in Automatik
 durch die Phasen garantiert, im Handbetrieb durch die Verriegelung.
 \end{falle}
 
-\subsection{Weitere Automaten aus AS 4}
-\SW{Safe} Init (Code-Array füllen) \ra Close (Zähler/Lampen reset) \ra
-CheckDigit (nur bei \R{risingEdge}, 4 Tasten, \R{correctCounter},
-\R{currentIndex}) \ra Open (grün, \R{lightDuration} 5\,s) bzw.\ WrongCode
-(rot, 5\,s) \ra Close. Zusatz: Doppelklick blau bricht ab; Code im Zustand
-Open mit beiden Tasten neu programmieren.
-\SW{Ampel-FB} Eingänge \R{clear\_road}, \R{block\_road},
-\R{disable\_system}; Init \ra Red \ra(clear) Red\&Yellow \ra(2\,s) Green
-\ra(block) Yellow \ra(5\,s) Red; Disabled: gelb blinkt 1\,s, zurück zu Red,
-wenn \R{disable} weg. Als FB \ra Kreuzung $=$ 4 Instanzen, Phase A
-(Ampel 1+3, 5\,s), Phase B (2+4, 8\,s), dazwischen sicherer Wechsel.
+\subsection{AS 4: Safe (Tresor) in ST}
+\label{bsp:safe}
+Init (Code-Array füllen) \ra Close (Zähler/Lampen reset) \ra CheckDigit
+(nur bei \R{risingEdge}, 4 Tasten) \ra Open (grün, \R{lightDuration}
+5\,s) bzw.\ WrongCode (rot, 5\,s) \ra Close. \R{TRUE} $=$ blau,
+\R{FALSE} $=$ gelb.
+\begin{lstlisting}
+TYPE E_SafeState : (S_INIT, S_CLOSE, S_CHECK, S_OPEN, S_WRONG); END_TYPE
+
+PROGRAM P_Safe
+VAR
+  eState       : E_SafeState := S_INIT;
+  fbBlau, fbGelb : EdgeDetector;          // aus AS 2 (PLCopenXML-Import)
+  codeArray    : ARRAY[0..3] OF BOOL;
+  currentIndex, correctCounter : INT;
+  tonLicht     : TON;
+  bTaste, bBlau : BOOL;
+END_VAR
+VAR CONSTANT lightDuration : TIME := T#5S; END_VAR
+
+// 1) Eingaenge + Timer VOR dem CASE
+fbBlau(inputValue := GVL.bTasterBlau);
+fbGelb(inputValue := GVL.bTasterGelb);
+bTaste := fbBlau.risingEdge OR fbGelb.risingEdge;
+bBlau  := fbBlau.risingEdge;
+tonLicht(IN := (eState = S_OPEN) OR (eState = S_WRONG), PT := lightDuration);
+
+// 2) Zustaende
+CASE eState OF
+S_INIT:
+  codeArray[0] := TRUE;  codeArray[1] := FALSE;   // blau, gelb,
+  codeArray[2] := FALSE; codeArray[3] := TRUE;    // gelb, blau
+  eState := S_CLOSE;
+S_CLOSE:
+  currentIndex := 0; correctCounter := 0;
+  eState := S_CHECK;
+S_CHECK:
+  IF bTaste THEN
+    IF bBlau = codeArray[currentIndex] THEN
+      correctCounter := correctCounter + 1;
+    END_IF
+    currentIndex := currentIndex + 1;   // ERST nach dem Vergleich
+    IF currentIndex >= 4 THEN
+      IF correctCounter = 4 THEN eState := S_OPEN;
+      ELSE                       eState := S_WRONG; END_IF
+    END_IF
+  END_IF
+S_OPEN, S_WRONG:
+  IF tonLicht.Q THEN eState := S_CLOSE; END_IF
+END_CASE
+
+// 3) Ausgaenge NACH dem CASE aus dem Zustand
+GVL.bLampeGruen := (eState = S_OPEN);
+GVL.bLampeRot   := (eState = S_WRONG);
+\end{lstlisting}
+\begin{falle}[Safe]
+Index zu früh erhöhen \ra falsches Array-Element verglichen bzw.\
+Zugriff auf \R{codeArray[4]} (ausserhalb). Ohne Flanke zählt ein
+gedrückter Taster in jedem Zyklus. Nach falschem Code nicht sofort
+abbrechen, sondern erst nach 4 Tasten \ra verrät nicht, welche Stelle
+falsch war.
+\end{falle}
+\SW{Zusatz} \R{doubleTap} blau bricht die Eingabe ab (\ra S\_CLOSE). Im
+Zustand Open beide Tasten gleichzeitig \ra neuer Zustand
+\R{S\_PROGRAM}, der 4 Tasten in \R{codeArray} schreibt.
+
+\subsection{AS 4: Ampel als Funktionsblock}
+\label{bsp:ampelfb}
+Init \ra Red \ra(clear) Red\&Yellow \ra(2\,s) Green \ra(block) Yellow
+\ra(5\,s) Red. Aus Red mit \R{disable\_system} \ra Disabled (gelb blinkt
+im 1-s-Takt) \ra zurück zu Red, wenn \R{disable} weg.
+\begin{lstlisting}
+TYPE E_Ampel : (A_INIT, A_RED, A_REDYELLOW, A_GREEN, A_YELLOW, A_DISABLED);
+END_TYPE
+
+FUNCTION_BLOCK FB_Ampel
+VAR_INPUT  clear_road, block_road, disable_system : BOOL; END_VAR
+VAR_OUTPUT red, yellow, green : BOOL; END_VAR
+VAR
+  eState : E_Ampel := A_INIT;
+  tonRY, tonY, tonBlink : TON;
+  bBlink : BOOL;
+END_VAR
+
+tonRY(IN := eState = A_REDYELLOW, PT := T#2S);
+tonY (IN := eState = A_YELLOW,    PT := T#5S);
+// Taktgeber: TON setzt sich mit NOT Q selbst zurueck
+tonBlink(IN := (eState = A_DISABLED) AND NOT tonBlink.Q, PT := T#1S);
+IF tonBlink.Q THEN bBlink := NOT bBlink; END_IF
+
+CASE eState OF
+A_INIT:      eState := A_RED;
+A_RED:       IF disable_system THEN eState := A_DISABLED;
+             ELSIF clear_road  THEN eState := A_REDYELLOW; END_IF
+A_REDYELLOW: IF tonRY.Q THEN eState := A_GREEN; END_IF
+A_GREEN:     IF block_road THEN eState := A_YELLOW; END_IF
+A_YELLOW:    IF tonY.Q THEN eState := A_RED; END_IF
+A_DISABLED:  IF NOT disable_system THEN eState := A_RED; END_IF
+END_CASE
+
+red    := (eState = A_RED) OR (eState = A_REDYELLOW);
+yellow := (eState = A_REDYELLOW) OR (eState = A_YELLOW)
+          OR ((eState = A_DISABLED) AND bBlink);
+green  := (eState = A_GREEN);
+\end{lstlisting}
+\begin{lstlisting}
+PROGRAM MAIN
+VAR
+  clear, block, disable : BOOL;      // Kontrollvariablen (Visu-Taster)
+  red, yellow, green    : BOOL;      // Ausgaenge (Visu-Lampen)
+  ampel_1 : FB_Ampel;
+END_VAR
+ampel_1(clear_road := clear, block_road := block, disable_system := disable,
+        red => red, yellow => yellow, green => green);
+\end{lstlisting}
+\SW{Visualisierung} VISUs \ra neue Visu; aus der Toolbox Lampen
+(\R{Lamp1}) und Taster (\R{Button}), in den Eigenschaften mit
+\R{MAIN.clear} bzw.\ \R{MAIN.red} verknüpfen.
+\SW{Kreuzung} Weil die Ampel ein FB ist: 4 Instanzen. Phase A (Ampel 1+3
+grün, 5\,s) \ra sicherer Wechsel (alle erst über Gelb auf Rot) \ra Phase B
+(2+4 grün, 8\,s) \ra zurück. Zusatz: Taster in der Visu deaktiviert die
+Anlage (\R{disable\_system} an alle Instanzen).
